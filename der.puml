@@ -1,0 +1,247 @@
+@startuml
+
+' avoid problems with angled crows feet
+skinparam linetype polyline
+skinparam linetype ortho
+
+entity "Sucursal" {
+    *sucursal_id: int <<generated>>
+    --
+    numero: bigint
+    direccion: nvarchar(255)
+    telefono: nvarchar(255)
+    mail: nvarchar(255)
+    *localidad: decimal(18,0) <<FK>>
+}
+
+
+entity "Cliente" {
+    *cliente_id: decimal(18,0) <<generated>>
+    --
+    dni: bigint
+    nombre: nvarchar(255)
+    apellido: nvarchar(255)
+    fecha_nacimiento: datetime2(6)
+    mail: nvarchar(255)
+    direccion: nvarchar(255)
+    telefono: nvarchar(255)
+    *localidad: decimal(18,0) <<FK>>
+}
+
+entity "Pedido" {
+    *pedido_id: decimal(18,0) <<generated>>
+    --
+    numero: decimal(18,0)
+    *sucursal: int <<FK>>
+    *cliente: decimal(18,0) <<FK>>
+    fecha: datetime2(6)
+    total: decimal(18,2)
+    *estado: int <<FK>>
+}
+
+entity "Estado" {
+    *estado_id: int <<generated>>
+    --
+    descripcion: nvarchar(255)
+}
+
+entity "PedidoSillon" {
+    *pedido_id: decimal(18,0) <<PK, FK>>
+    *sillon_id: decimal(18,0) <<PK, FK>>
+    --
+}
+
+entity "Sillon" {
+    *sillon_id: decimal(18,0) <<generated>>
+    --
+    codigo: bigint
+    *modelo: decimal(18,0) <<FK>>
+    *medidas: int <<FK>>
+    cantidad: bigint
+    precio: decimal(18,2)
+    subtotal: decimal(18,2)
+}
+
+entity "Medida" {
+    *medida_id: int <<generated>>
+    --
+    medida_alto: decimal(18,2)
+    medida_ancho: decimal(18,2)
+    medida_profundidad: decimal(18,2)
+    medida_precio: decimal(18,2)
+}
+
+entity "SillonModelo" {
+    *modelo_id: decimal(18,0) <<generated>>
+    --
+    modelo: nvarchar(255)
+    modelo_codigo: bigint
+    modelo_descripcion: nvarchar(255)
+    modelo_precio: decimal(18,2)
+}
+
+entity "SillonMaterial" {
+    *sillon_id: decimal(18,0) <<PK, FK>>
+    *material_id: decimal(18,0) <<PK, FK>>
+    --
+}
+
+entity "Material" {
+    *material_id: decimal(18,0) <<generated>>
+    --
+    *tipo: decimal(18,0) <<FK>>
+    nombre: nvarchar(255)
+    descripcion: nvarchar(255)
+    precio: decimal(38,2)
+}
+
+entity "TipoMaterial" {
+    *tipo_id: decimal(18,0) <<generated>>
+    --
+    descripcion: nvarchar(255)
+}
+
+entity "Tela" {
+    *tela_id: decimal(18,0) <<generated>>
+    --
+    *material_id: decimal(18,0) <<FK>>
+    color: nvarchar(255)
+    textura: nvarchar(255)
+}
+
+entity "Madera" {
+    *madera_id: decimal(18,0) <<generated>>
+    --
+    *material_id: decimal(18,0) <<FK>>
+    color: nvarchar(255)
+    dureza: nvarchar(255)
+}
+
+entity "Relleno" {
+    *relleno_id: decimal(18,0) <<generated>>
+    --
+    *material_id: decimal(18,0) <<FK>>
+    relleno_densidad: decimal(38,2)
+}
+
+entity "PedidoCancelacion" {
+    *cancelacion_id: decimal(18,0) <<generated>>
+    --
+    *pedido: decimal(18,0) <<FK>>
+    fecha: datetime2(6)
+    motivo: varchar(255)
+}
+
+
+entity "Factura" {
+    *factura_id: decimal(18,0) <<generated>>
+    --
+    numero: bigint
+    *cliente: decimal(18,0) <<FK>>
+    *sucursal: int <<FK>>
+    fecha: datetime2(6)
+    total: decimal(38,2)
+}
+
+entity "FacturaDetalleFactura" {
+    *factura_id: decimal(18,0) <<PK, FK>>
+    *detalle_id: decimal(18,0) <<PK, FK>>
+    --
+}
+
+
+entity "DetalleFactura" {
+    *detalle_id: decimal(18,0) <<generated>>
+    --
+    detalle_pedido: decimal(18,0)
+    precio: decimal(18,2)
+    cantidad: decimal(18,0)
+    subtotal: decimal(18,2)
+}
+
+entity "Envio" {
+    *envio_id: decimal(18,0) <<generated>>
+    --
+    numero: decimal(18,0)
+    *factura: decimal(18, 0) <<FK>>
+    fecha_programada: datetime2(2)
+    fecha_entrega: datetime2(6)
+    importe_traslado: decimal(18,2)
+    importe_subida: decimal(18,2)
+    total: decimal(18,2)
+}
+
+
+entity "Proveedor" {
+    *proveedor_id: decimal(18,0) <<generated>>
+    --
+    razon_social: nvarchar(255)
+    cuit: nvarchar(255)
+    direccion: nvarchar(255)
+    telefono: nvarchar(255)
+    mail: nvarchar(255)
+    *localidad: decimal(18,0) <<FK>>
+}
+
+entity "Compra" {
+    *compra_id: decimal(18,0) <<generated>>
+    --
+    numero: decimal(18,0)
+    *sucursal: int <<FK>>
+    *proveedor: decimal(18,0) <<FK>>
+    fecha_compra: datetime2(6)
+    total: decimal(18,2)
+}
+
+entity "DetalleCompra" {
+    *detalle_compra_id: decimal(18,0) <<generated>>
+    --
+    *material_id: decimal(18,0) <<FK>>
+    precio_unitario: decimal(18,2)
+    cantidad: decimal(18,0)
+    subtotal: decimal(18,2)
+}
+
+entity "Localidad" {
+    *localidad_id: decimal(18,0) <<generated>>
+    --
+    descripcion: nvarchar(255)
+    *provincia: int <<FK>>
+}
+
+
+entity "Provincia" {
+    *provincia_id: int <<generated>>
+    --
+    descripcion: nvarchar(255)
+}
+
+Localidad }|--|| Provincia
+Cliente }|--o| Localidad
+Proveedor }|--o| Localidad
+Sucursal }|--o| Localidad
+Pedido }|--|| Sucursal
+Pedido }|--|| Cliente
+Pedido ||--|{ PedidoSillon
+PedidoSillon }|--|| Sillon
+Pedido ||-u-|{ Estado
+Sillon }|-l-|| SillonModelo
+Sillon }|--|| Medida
+Sillon ||--|{ SillonMaterial
+SillonMaterial }|--|| Material
+Material ||--|| Madera
+Material ||-r-|| TipoMaterial
+Material ||--|| Relleno
+Material ||--|| Tela
+Factura }|--|| Cliente
+Factura }|--|| Sucursal
+Factura ||--|{ FacturaDetalleFactura
+FacturaDetalleFactura }|--|| DetalleFactura
+Envio ||--|| Factura
+Compra }|--|| Proveedor
+Compra }|--|| Sucursal
+Compra ||--|{ DetalleCompra
+DetalleCompra }|--|| Material
+PedidoCancelacion |o-l-|| Pedido
+
+@enduml
