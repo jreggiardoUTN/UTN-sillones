@@ -654,11 +654,159 @@ WHERE ma.material_id IS NOT NULL
   AND m.Relleno_Densidad IS NOT NULL
 GO
 
+--MIGRACION PROOVEDOR
+INSERT INTO [NULL_POINTER].[Proveedor] 
+  (
+  --razon_social, me da error porque falta crearlo...
+  cuit, 
+  direccion, 
+  telefono, 
+  mail, 
+  localidad
+  )
+SELECT DISTINCT 
+  --Proveedor_RazonSocial,
+  Proveedor_Cuit,
+  Proveedor_Direccion,
+  Proveedor_Telefono,
+  Proveedor_Mail,
+  l.localidad_id
+FROM gd_esquema.Maestra m
+  LEFT JOIN NULL_POINTER.Provincia p ON p.descripcion = m.Proveedor_Provincia
+  LEFT JOIN NULL_POINTER.Localidad l ON l.descripcion = m.Proveedor_Localidad
+    AND l.provincia = p.provincia_id
+WHERE Proveedor_Cuit IS NOT NULL
+ORDER BY 1;
+GO
+
+--MIGRACION FACTURA, DETALLEFACTURA, FACTURADETALLEFACTURA
+INSERT INTO [NULL_POINTER].[Factura] 
+  (
+  numero, 
+  cliente, 
+  sucursal, 
+  fecha, 
+  total
+  )
+SELECT DISTINCT
+  Factura_Numero,
+  c.cliente_id,
+  s.sucursal_id,
+  Factura_Fecha,
+  Factura_Total
+FROM gd_esquema.Maestra m
+  LEFT JOIN NULL_POINTER.Cliente c ON c.dni = m.Cliente_Dni
+  LEFT JOIN NULL_POINTER.Sucursal s ON s.numero = m.Sucursal_NroSucursal
+WHERE Factura_Numero IS NOT NULL
+ORDER BY 1;
+GO
+
+INSERT INTO [NULL_POINTER].[DetalleFactura] 
+  (
+  detalle_pedido, 
+  precio, 
+  cantidad, 
+  subtotal
+  )
+SELECT DISTINCT
+  p.pedido_id,
+  Detalle_Pedido_Precio,
+  Detalle_Pedido_Cantidad,
+  Detalle_Pedido_SubTotal
+FROM gd_esquema.Maestra m
+  JOIN NULL_POINTER.Pedido p ON p.numero = m.Pedido_Numero
+WHERE Detalle_Pedido_Cantidad IS NOT NULL
+ORDER BY 1;
+GO
+
+INSERT INTO NULL_POINTER.FacturaDetalleFactura 
+  (
+  factura_id, 
+  detalle_id
+  )
+SELECT DISTINCT
+  f.factura_id,
+  df.detalle_id
+FROM gd_esquema.Maestra m
+JOIN NULL_POINTER.Factura f ON f.numero = m.Factura_Numero
+JOIN NULL_POINTER.Pedido p ON p.numero = m.Pedido_Numero
+JOIN NULL_POINTER.DetalleFactura df ON df.detalle_pedido = p.pedido_id
+WHERE m.Factura_Numero IS NOT NULL;
+GO
+
+-- MIGRACIÓN ENVÍO
+INSERT INTO NULL_POINTER.Envio 
+  (
+  numero, 
+  factura, 
+  fecha_programada, 
+  fecha_entrega, 
+  importe_traslado, 
+  importe_subida, 
+  total
+  )
+SELECT DISTINCT
+  Envio_Numero,
+  f.factura_id,
+  Envio_Fecha_Programada,
+  Envio_Fecha,
+  Envio_ImporteTraslado,
+  Envio_ImporteSubida,
+  Envio_Total
+FROM gd_esquema.Maestra m
+  JOIN NULL_POINTER.Factura f ON f.numero = m.Factura_Numero
+WHERE Envio_Numero IS NOT NULL
+ORDER BY 1;
+GO
+
+--COMPRA, DETALLECOMPRA
+INSERT INTO NULL_POINTER.Compra 
+  (
+  numero,
+  sucursal,
+  proveedor,
+  fecha_compra,
+  total
+  )
+SELECT DISTINCT
+  Compra_Numero,
+  s.sucursal_id,
+  p.proveedor_id,
+  Compra_Fecha,
+  Compra_Total
+FROM gd_esquema.Maestra m
+  LEFT JOIN NULL_POINTER.Sucursal s ON s.numero = m.Sucursal_NroSucursal
+  LEFT JOIN NULL_POINTER.Proveedor p ON p.cuit = m.Proveedor_Cuit
+WHERE Compra_Numero IS NOT NULL
+ORDER BY 1;
+GO
+
+INSERT INTO NULL_POINTER.DetalleCompra (
+  material_id,
+  precio_unitario,
+  cantidad,
+  subtotal
+)
+SELECT DISTINCT
+  mat.material_id,
+  Detalle_Compra_Precio,
+  Detalle_Compra_Cantidad,
+  Detalle_Compra_SubTotal
+FROM gd_esquema.Maestra m
+JOIN NULL_POINTER.Material mat 
+  ON mat.nombre = m.Material_Nombre
+    AND mat.descripcion = m.Material_Descripcion
+    AND mat.precio = m.Material_Precio
+WHERE Detalle_Compra_Precio IS NOT NULL
+ORDER BY 1;
+GO
+
 -- Faltan:
 -- Sillon, PedidoSillon, SillonMaterial,
--- Factura, FacturaDetalleFactura, DetalleFactura
--- Envio
--- Compra, Proveedor, DetalleCompra
+
+-- Factura, FacturaDetalleFactura, DetalleFactura(LISTO)
+-- Envio  (LISTO)
+-- Compra, Proveedor, DetalleCompra   (LISTO)
 
 -- Definir:
 -- Cada tipo de material tiene uno que se repite porque el precio
