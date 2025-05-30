@@ -1,7 +1,3 @@
--- Pedido: borrar detalle_id porque usa tabla intermedia
--- PedidoSillon: cambiar detalle_id por sillon_id
--- Sillon: cambiar modelo nvarchar por decimal, es FK
-
 USE [GD1C2025]
 GO
 
@@ -261,7 +257,7 @@ CREATE TABLE [NULL_POINTER].[SillonModelo]
   modelo NVARCHAR(255),
   modelo_codigo BIGINT,
   modelo_descripcion NVARCHAR(255),
-  precio_precio DECIMAL(18, 2)
+  modelo_precio DECIMAL(18, 2)
 )
 
 IF NOT EXISTS(SELECT [name]
@@ -500,7 +496,6 @@ FROM (
     FROM gd_esquema.Maestra
 ) AS PROVINCIAS
 WHERE PROVINCIA IS NOT NULL
-ORDER BY 1
 GO
 
 INSERT INTO [NULL_POINTER].[Localidad]
@@ -520,7 +515,6 @@ FROM (
       JOIN NULL_POINTER.Provincia p ON p.descripcion = m.Proveedor_Provincia
 ) AS Localidades
 WHERE localidad IS NOT NULL
-ORDER BY 1
 GO
 
 INSERT INTO [NULL_POINTER].[Sucursal]
@@ -533,11 +527,10 @@ INSERT INTO [NULL_POINTER].[Sucursal]
   )
 SELECT DISTINCT Sucursal_NroSucursal, Sucursal_Direccion, Sucursal_telefono, Sucursal_mail, l.localidad_id
 FROM gd_esquema.Maestra m
-  LEFT JOIN NULL_POINTER.Provincia p ON p.descripcion = m.Sucursal_Provincia
-  LEFT JOIN NULL_POINTER.Localidad l ON l.descripcion = m.Sucursal_Localidad
+LEFT JOIN NULL_POINTER.Provincia p ON p.descripcion = m.Sucursal_Provincia
+LEFT JOIN NULL_POINTER.Localidad l ON l.descripcion = m.Sucursal_Localidad
     AND p.provincia_id = l.provincia
 WHERE Sucursal_NroSucursal IS NOT NULL
-ORDER BY 1
 GO
 
 INSERT INTO [NULL_POINTER].[Cliente]
@@ -557,7 +550,6 @@ FROM gd_esquema.Maestra m
   LEFT JOIN NULL_POINTER.Localidad l ON l.descripcion = m.Cliente_Localidad
     AND p.provincia_id = l.provincia
 WHERE Cliente_Dni IS NOT NULL
-ORDER BY 1
 GO
 
 INSERT INTO [NULL_POINTER].[Estado]
@@ -565,6 +557,115 @@ INSERT INTO [NULL_POINTER].[Estado]
 SELECT DISTINCT Pedido_Estado
 FROM gd_esquema.Maestra
 WHERE Pedido_Estado IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[Pedido]
+(numero, sucursal, cliente, fecha, total, estado)
+SELECT DISTINCT m.Pedido_Numero, s.sucursal_id, c.cliente_id, m.Pedido_Fecha, m.Pedido_Total, e.estado_id
+FROM gd_esquema.Maestra m
+LEFT JOIN NULL_POINTER.Sucursal s ON s.numero = m.Sucursal_NroSucursal
+  AND s.direccion = m.Sucursal_Direccion
+LEFT JOIN NULL_POINTER.Cliente c ON c.nombre = m.Cliente_Nombre
+  AND c.apellido = m.Cliente_Apellido
+  AND c.direccion = m.Cliente_Direccion
+  AND c.dni = m.Cliente_Dni
+  AND c.fecha_nacimiento = m.Cliente_FechaNacimiento
+  AND c.telefono = m.Cliente_Telefono
+LEFT JOIN NULL_POINTER.Estado e ON e.descripcion = m.Pedido_Estado
+WHERE m.Pedido_Numero IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[PedidoCancelacion]
+  (pedido, fecha, motivo)
+SELECT DISTINCT p.pedido_id, m.Pedido_Cancelacion_Fecha, m.Pedido_Cancelacion_Motivo
+FROM gd_esquema.Maestra m
+LEFT JOIN NULL_POINTER.Pedido p ON p.numero = m.Pedido_Numero
+  AND p.fecha = m.Pedido_Fecha
+  AND p.total = m.Pedido_Total
+LEFT JOIN NULL_POINTER.Estado e ON e.descripcion = m.Pedido_Estado
+WHERE m.Pedido_Cancelacion_Fecha IS NOT NULL OR m.Pedido_Cancelacion_Motivo IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[SillonModelo]
+  (modelo, modelo_codigo, modelo_descripcion, modelo_precio)
+SELECT DISTINCT m.Sillon_Modelo, m.Sillon_Modelo_Codigo, m.Sillon_Modelo_Descripcion, m.Sillon_Modelo_Precio
+FROM gd_esquema.Maestra m
+WHERE m.Sillon_Modelo IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[Medida]
+  (medida_alto, medida_ancho, medida_profundidad, medida_precio)
+SELECT DISTINCT m.Sillon_Medida_Alto, m.Sillon_Medida_Ancho, m.Sillon_Medida_Profundidad, m.Sillon_Medida_Precio
+FROM gd_esquema.Maestra m
+WHERE m.Sillon_Medida_Alto IS NOT NULL
+  OR m.Sillon_Medida_Ancho IS NOT NULL
+  OR m.Sillon_Medida_Precio IS NOT NULL
+  OR m.Sillon_Medida_Profundidad IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[TipoMaterial]
+  (descripcion)
+SELECT DISTINCT Material_Tipo
+FROM gd_esquema.Maestra
+WHERE Material_Tipo IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[Material]
+  (tipo, nombre, descripcion, precio)
+SELECT DISTINCT t.tipo_id, m.Material_Nombre, m.Material_Descripcion, m.Material_Precio
+FROM gd_esquema.Maestra m
+JOIN NULL_POINTER.TipoMaterial t ON t.descripcion = m.Material_Tipo
+WHERE m.Material_Nombre IS NOT NULL
+ORDER BY 1, 2
+GO
+
+INSERT INTO [NULL_POINTER].[Tela]
+  (material_id, color, textura)
+SELECT DISTINCT ma.material_id, m.Tela_Color, m.Tela_Textura
+FROM gd_esquema.Maestra m
+LEFT JOIN NULL_POINTER.Material ma ON ma.nombre = m.Material_Nombre
+  AND ma.descripcion = m.Material_Descripcion
+  AND ma.precio = m.Material_Precio
+WHERE ma.material_id IS NOT NULL
+  AND m.Tela_Color IS NOT NULL
+  AND m.Tela_Textura IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[Madera]
+  (material_id, color, dureza)
+SELECT DISTINCT ma.material_id, m.Madera_Color, m.Madera_Dureza
+FROM gd_esquema.Maestra m
+LEFT JOIN NULL_POINTER.Material ma ON ma.nombre = m.Material_Nombre
+  AND ma.descripcion = m.Material_Descripcion
+  AND ma.precio = m.Material_Precio
+WHERE ma.material_id IS NOT NULL
+  AND m.Madera_Color IS NOT NULL
+  AND m.Madera_Dureza IS NOT NULL
+GO
+
+INSERT INTO [NULL_POINTER].[Relleno]
+  (material_id, relleno_densidad)
+SELECT DISTINCT ma.material_id, m.Relleno_Densidad
+FROM gd_esquema.Maestra m
+LEFT JOIN NULL_POINTER.Material ma ON ma.nombre = m.Material_Nombre
+  AND ma.descripcion = m.Material_Descripcion
+  AND ma.precio = m.Material_Precio
+WHERE ma.material_id IS NOT NULL
+  AND m.Relleno_Densidad IS NOT NULL
+GO
+
+-- Faltan:
+-- Sillon, PedidoSillon, SillonMaterial,
+-- Factura, FacturaDetalleFactura, DetalleFactura
+-- Envio
+-- Compra, Proveedor, DetalleCompra
+
+-- Definir:
+-- Cada tipo de material tiene uno que se repite porque el precio
+-- es diferente pero esta en la principal de Material, ej:
+-- Tela
+-- material_id x, color rojo, textura rugosa
+-- material_id y, color rojo, textura rugosa
 
 COMMIT
 GO
