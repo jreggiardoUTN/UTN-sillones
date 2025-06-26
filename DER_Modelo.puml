@@ -153,7 +153,7 @@ entity "FacturaDetalleFactura" {
 entity "DetalleFactura" {
     *detalle_id: decimal(18,0) <<generated>>
     --
-    detalle_pedido: decimal(18,0)
+    detalle_pedido: decimal(18,0) <<FK>>
     precio: decimal(18,2)
     cantidad: decimal(18,0)
     subtotal: decimal(18,2)
@@ -237,6 +237,7 @@ Factura }|--|| Cliente
 Factura }|--|| Sucursal
 Factura ||--|{ FacturaDetalleFactura
 FacturaDetalleFactura }|--|| DetalleFactura
+DetalleFactura ||--|| Sillon
 Envio ||--|| Factura
 Compra }|--|| Proveedor
 Compra }|--|| Sucursal

@@ -1,0 +1,74 @@
+@startuml
+
+' avoid problems with angled crows feet
+skinparam linetype polyline
+skinparam linetype ortho
+
+entity "BI_dimension_tiempos" {
+    *tiempo_id: int <<generated>>
+    --
+    mes: int
+    cuatrimestre: int
+    anio: int
+}
+
+entity "BI_dimension_ubicaciones" {
+    *ubicacion_id: int <<generated>>
+    --
+    localidad_descripcion: nvarchar(255)
+    provincia_descripcion: nvarchar(255)
+}
+
+entity "BI_dimension_rangos_edades" {
+    *rango_id: int <<generated>>
+    --
+    rango_descripcion: nvarchar(255)
+}
+
+entity "BI_dimension_turnos" {
+    *turno_id: int <<generated>>
+    --
+    turno_descripcion: nvarchar(255)
+}
+
+entity "BI_dimension_tipo_material" {
+    *tipo_id: int <<generated>>
+    --
+    tipo_descripcion: nvarchar(255)
+}
+
+entity "BI_dimension_modelo_sillon" {
+    *modelo_id: int <<generated>>
+    --
+    modelo: nvarchar(255)
+    modelo_codigo: bigint
+    modelo_descripcion: nvarchar(255)
+}
+
+entity "BI_dimension_estado_pedido" {
+    *estado_id: int <<generated>>
+    --
+    estado_descripcion: nvarchar(255)
+}
+
+entity "BI_hechos_ventas" {
+    *venta_id: int <<generated>>
+    --
+}
+
+entity "BI_hecho_compra" {
+    *compra_id: int <<generated>>
+    --
+}
+
+entity "BI_hechos_envios" {
+    *envio_id: int <<generated>>
+    --
+}
+
+' Localidad }|--|| Provincia
+' Cliente }|--o| Localidad
+' Pedido ||-u-|{ Estado
+' Sillon }|-l-|| SillonModelo
+
+@enduml
