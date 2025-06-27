@@ -143,6 +143,18 @@ CREATE TABLE [DROP_TABLE].[BI_dimension_estado_pedido]
   estado_descripcion NVARCHAR (255)
 )
 
+IF NOT EXISTS(SELECT [name]  ---BI_hechos_envios
+FROM sys.tables
+WHERE [name] = 'BI_hechos_envios')
+CREATE TABLE DROP_TABLE.BI_hechos_envios (
+  envio_id INT IDENTITY(1,1) PRIMARY KEY,
+  tiempo_id INT,
+  ubicacion_id INT,
+  importe_traslado DECIMAL(18,2),
+  importe_subida DECIMAL(18,2),
+  total DECIMAL(18,2)
+)
+
 COMMIT
 GO
 
@@ -283,14 +295,38 @@ SELECT DISTINCT descripcion
 FROM [DROP_TABLE].Estado
 GO
 
+
+--INSERT INTO [DROP_TABLE].[BI_hechos_envios]
+INSERT INTO DROP_TABLE.BI_hechos_envios (
+  tiempo_id,
+  ubicacion_id,
+  importe_traslado,
+  importe_subida,
+  total
+)
+SELECT 
+  DROP_TABLE.fn_GetTiempoId(e.fecha_entrega),
+  ubi.ubicacion_id,
+  e.importe_traslado,
+  e.importe_subida,
+  e.total
+FROM DROP_TABLE.Envio e
+JOIN DROP_TABLE.Factura f ON f.factura_id = e.factura
+JOIN DROP_TABLE.Sucursal s ON s.sucursal_id = f.sucursal
+JOIN DROP_TABLE.Localidad l ON l.localidad_id = s.localidad
+JOIN DROP_TABLE.Provincia p ON p.provincia_id = l.provincia
+JOIN DROP_TABLE.BI_dimension_ubicaciones ubi 
+     ON ubi.localidad_descripcion = l.descripcion 
+     AND ubi.provincia_descripcion = p.descripcion;
+
+GO
+
 -- INSERT INTO [DROP_TABLE].[BI_hechos_ventas](
 -- GO
 
 -- INSERT INTO [DROP_TABLE].[BI_hecho_compra](
 -- GO
 
--- INSERT INTO [DROP_TABLE].[BI_hechos_envios](
--- GO
 
 COMMIT
 GO
