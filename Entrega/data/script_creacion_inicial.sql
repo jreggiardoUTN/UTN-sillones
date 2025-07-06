@@ -447,7 +447,7 @@ INSERT INTO [DROP_TABLE].[Provincia]
   (descripcion)
 SELECT DISTINCT PROVINCIA
 FROM (
-        SELECT Sucursal_Provincia AS PROVINCIA
+    SELECT Sucursal_Provincia AS PROVINCIA
     FROM gd_esquema.Maestra
   UNION
     SELECT Cliente_Provincia AS PROVINCIA
@@ -520,7 +520,6 @@ FROM gd_esquema.Maestra
 WHERE Pedido_Estado IS NOT NULL
 GO
 
--- 20509
 INSERT INTO [DROP_TABLE].[Pedido]
   (numero, sucursal, cliente, fecha, total, estado)
 SELECT DISTINCT m.Pedido_Numero, s.sucursal_id, c.cliente_id, m.Pedido_Fecha, m.Pedido_Total, e.estado_id
@@ -630,24 +629,23 @@ WHERE (m.Sillon_Codigo IS NOT NULL
   AND m.Factura_Numero IS NULL
 GO
 
--- 72166
 INSERT INTO [DROP_TABLE].[ItemPedido]
   (pedido_id, sillon_id, cantidad, subtotal, precio)
 SELECT DISTINCT p.pedido_id, s.sillon_id, m.Detalle_Pedido_Cantidad, m.Detalle_Pedido_Precio, m.Detalle_Pedido_SubTotal
 FROM gd_esquema.Maestra m
-INNER JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
-  AND p.fecha = m.Pedido_Fecha
-  AND p.total = m.Pedido_Total
-INNER JOIN DROP_TABLE.Sucursal su ON su.numero = m.Sucursal_NroSucursal
-  AND su.direccion = m.Sucursal_Direccion
-  AND su.telefono = m.Sucursal_telefono
-  AND su.mail = m.Sucursal_mail
-  AND su.sucursal_id = p.sucursal
-INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
-INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
-  AND mo.modelo = m.Sillon_Modelo
-  AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
-LEFT JOIN DROP_TABLE.Medida me ON me.medida_alto = m.Sillon_Medida_Alto
+  INNER JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
+    AND p.fecha = m.Pedido_Fecha
+    AND p.total = m.Pedido_Total
+  INNER JOIN DROP_TABLE.Sucursal su ON su.numero = m.Sucursal_NroSucursal
+    AND su.direccion = m.Sucursal_Direccion
+    AND su.telefono = m.Sucursal_telefono
+    AND su.mail = m.Sucursal_mail
+    AND su.sucursal_id = p.sucursal
+  INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
+  INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
+    AND mo.modelo = m.Sillon_Modelo
+    AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
+  LEFT JOIN DROP_TABLE.Medida me ON me.medida_alto = m.Sillon_Medida_Alto
     AND me.medida_ancho = m.Sillon_Medida_Ancho
     AND me.medida_precio = m.Sillon_Medida_Precio
     AND me.medida_profundidad = m.Sillon_Medida_Profundidad
@@ -657,15 +655,15 @@ INSERT INTO [DROP_TABLE].[SillonMaterial]
   (sillon_id, material_id)
 SELECT DISTINCT s.sillon_id, ma.material_id
 FROM gd_esquema.Maestra m
-INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
-INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
-  AND mo.modelo = m.Sillon_Modelo
-  AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
-INNER JOIN DROP_TABLE.TipoMaterial tm ON tm.descripcion = m.Material_Tipo
-INNER JOIN DROP_TABLE.Material ma ON ma.tipo = tm.tipo_id
-  AND ma.nombre = m.Material_Nombre
-  AND ma.descripcion = m.Material_Descripcion
-  AND ma.precio = m.Material_Precio
+  INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
+  INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
+    AND mo.modelo = m.Sillon_Modelo
+    AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
+  INNER JOIN DROP_TABLE.TipoMaterial tm ON tm.descripcion = m.Material_Tipo
+  INNER JOIN DROP_TABLE.Material ma ON ma.tipo = tm.tipo_id
+    AND ma.nombre = m.Material_Nombre
+    AND ma.descripcion = m.Material_Descripcion
+    AND ma.precio = m.Material_Precio
 GO
 
 INSERT INTO [DROP_TABLE].[Proveedor]
@@ -692,7 +690,6 @@ WHERE Proveedor_Cuit IS NOT NULL
 ORDER BY 1;
 GO
 
--- 17408
 INSERT INTO [DROP_TABLE].[Factura]
   (
   numero,
@@ -719,9 +716,6 @@ WHERE Factura_Numero IS NOT NULL
 ORDER BY 1;
 GO
 
--- 61k
--- // HERE
-SELECT DISTINCT * FROM  [DROP_TABLE].[DetalleFactura]
 INSERT INTO [DROP_TABLE].[DetalleFactura]
   (
   factura_id,
@@ -730,46 +724,23 @@ INSERT INTO [DROP_TABLE].[DetalleFactura]
   cantidad,
   subtotal
   )
-SELECT DISTINCT
+
+SELECT
   f.factura_id,
   ip.item_pedido_id,
   m.Detalle_Factura_Precio,
   m.Detalle_Factura_Cantidad,
   m.Detalle_Factura_SubTotal
 FROM gd_esquema.Maestra m
-JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
-JOIN DROP_TABLE.ItemPedido ip ON ip.pedido_id = p.pedido_id
+LEFT JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
+LEFT JOIN DROP_TABLE.ItemPedido ip ON ip.pedido_id = p.pedido_id
   AND ip.cantidad = m.Detalle_Pedido_Cantidad
   AND ip.precio = m.Detalle_Pedido_Precio
 LEFT JOIN DROP_TABLE.Factura f ON f.numero = m.Factura_Numero
-WHERE Detalle_Factura_Cantidad IS NOT NULL
-GROUP BY f.factura_id,   ip.item_pedido_id,
-  m.Detalle_Factura_Precio,
-  m.Detalle_Factura_Cantidad,
-  m.Detalle_Factura_SubTotal
+WHERE m.Detalle_Factura_Cantidad IS NOT NULL
+  AND m.Detalle_Factura_Precio IS NOT NULL
+  AND m.Detalle_Factura_SubTotal IS NOT NULL;
 GO
-
-SELECT Factura_Numero, Detalle_Factura_Cantidad FROM gd_esquema.Maestra
-WHERE Detalle_Factura_Precio IS NOT NULL
--- // WIP
-
-    -- INSERT INTO GDDIENTOS.Item_Factura
-    --     (item_factura_codigo_factura,
-    --     item_factura_item_pedido_codigo, item_factura_precio_unitario,
-    --     item_factura_cantidad, item_factura_subtotal)
-    -- SELECT factura_numero, item_pedido_codigo, Detalle_Factura_Precio,
-    --     Detalle_Factura_Cantidad, Detalle_Factura_SubTotal
-    -- FROM gd_esquema.Maestra
-    --     JOIN GDDIENTOS.Item_Pedido ON item_pedido_codigo_pedido = pedido_numero
-    --         AND item_pedido_precio_unitario = detalle_factura_precio
-    --         AND item_pedido_cantidad = detalle_factura_cantidad
-    -- GROUP BY factura_numero, item_pedido_codigo, Detalle_Factura_Precio,
-    --     Detalle_Factura_Cantidad, Detalle_Factura_SubTotal
-
-
-SELECT DISTINCT pedido_numero FROM gd_esquema.Maestra
-
-
 
 INSERT INTO [DROP_TABLE].[Envio]
   (
@@ -795,7 +766,6 @@ WHERE Envio_Numero IS NOT NULL
 ORDER BY 1;
 GO
 
--- 711
 INSERT INTO [DROP_TABLE].[Compra]
   (
   numero,
@@ -824,7 +794,7 @@ INSERT INTO [DROP_TABLE].[DetalleCompra]
   cantidad,
   subtotal
   )
-SELECT DISTINCT
+SELECT
   mat.material_id,
   Detalle_Compra_Precio,
   Detalle_Compra_Cantidad,
