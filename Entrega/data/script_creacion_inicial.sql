@@ -34,8 +34,6 @@ IF OBJECT_ID('DROP_TABLE.Factura','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].Factura;
 IF OBJECT_ID('DROP_TABLE.DetalleFactura','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].DetalleFactura;
-IF OBJECT_ID('DROP_TABLE.FacturaDetalleFactura','U') IS NOT NULL
-  DROP TABLE [DROP_TABLE].FacturaDetalleFactura;
 IF OBJECT_ID('DROP_TABLE.Pedido','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].Pedido;
 IF OBJECT_ID('DROP_TABLE.PedidoCancelacion','U') IS NOT NULL
@@ -48,8 +46,8 @@ IF OBJECT_ID('DROP_TABLE.Compra','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].Compra;
 IF OBJECT_ID('DROP_TABLE.Estado','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].Estado;
-IF OBJECT_ID('DROP_TABLE.PedidoSillon','U') IS NOT NULL
-  DROP TABLE [DROP_TABLE].PedidoSillon;
+IF OBJECT_ID('DROP_TABLE.ItemPedido','U') IS NOT NULL
+  DROP TABLE [DROP_TABLE].ItemPedido;
 IF OBJECT_ID('DROP_TABLE.Sillon','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].Sillon;
 IF OBJECT_ID('DROP_TABLE.SillonModelo','U') IS NOT NULL
@@ -114,20 +112,11 @@ WHERE [name] = 'DetalleFactura')
 CREATE TABLE [DROP_TABLE].[DetalleFactura]
 (
   detalle_id DECIMAL(18, 0) IDENTITY(1,1) PRIMARY KEY,
+  factura_id DECIMAL(18, 0), -- FK
   detalle_pedido DECIMAL(18, 0), -- FK
   precio DECIMAL(18, 2),
   cantidad DECIMAL(18, 0),
   subtotal DECIMAL(18, 2)
-)
-
-IF NOT EXISTS(SELECT [name]
-FROM sys.tables
-WHERE [name] = 'FacturaDetalleFactura')
-CREATE TABLE [DROP_TABLE].[FacturaDetalleFactura]
-(
-  factura_id DECIMAL(18, 0), -- PK, FK
-  detalle_id DECIMAL (18, 0), -- PK, FK
-  PRIMARY KEY (factura_id, detalle_id)
 )
 
 IF NOT EXISTS(SELECT [name]
@@ -215,19 +204,19 @@ CREATE TABLE [DROP_TABLE].[Sillon]
   codigo BIGINT,
   modelo DECIMAL(18, 0), -- FK
   medidas INT, -- FK
-  cantidad BIGINT,
-  precio DECIMAL(18, 2),
-  subtotal DECIMAL(18, 2)
 )
 
 IF NOT EXISTS(SELECT [name]
 FROM sys.tables
-WHERE [name] = 'PedidoSillon')
-CREATE TABLE [DROP_TABLE].[PedidoSillon]
+WHERE [name] = 'ItemPedido')
+CREATE TABLE [DROP_TABLE].[ItemPedido]
 (
+  item_pedido_id DECIMAL(18, 0) IDENTITY(1,1) PRIMARY KEY,
   pedido_id DECIMAL(18, 0), -- PK, FK
   sillon_id DECIMAL (18, 0), -- PK, FK
-  PRIMARY KEY (pedido_id, sillon_id)
+  cantidad BIGINT,
+  subtotal DECIMAL(18, 2),
+  precio DECIMAL(18, 2)
 )
 
 IF NOT EXISTS(SELECT [name]
@@ -402,10 +391,10 @@ ADD FOREIGN KEY (sucursal) REFERENCES [DROP_TABLE].Sucursal(sucursal_id);
 ALTER TABLE [DROP_TABLE].[Compra]
 ADD FOREIGN KEY (proveedor) REFERENCES [DROP_TABLE].Proveedor(proveedor_id);
 
-ALTER TABLE [DROP_TABLE].[PedidoSillon]
+ALTER TABLE [DROP_TABLE].[ItemPedido]
 ADD FOREIGN KEY (pedido_id) REFERENCES [DROP_TABLE].Pedido(pedido_id);
 
-ALTER TABLE [DROP_TABLE].[PedidoSillon]
+ALTER TABLE [DROP_TABLE].[ItemPedido]
 ADD FOREIGN KEY (sillon_id) REFERENCES [DROP_TABLE].Sillon(sillon_id);
 
 ALTER TABLE [DROP_TABLE].[Sillon]
@@ -442,13 +431,10 @@ ALTER TABLE [DROP_TABLE].[Localidad]
 ADD FOREIGN KEY (provincia) REFERENCES [DROP_TABLE].Provincia(provincia_id);
 
 ALTER TABLE [DROP_TABLE].[DetalleFactura]
-ADD FOREIGN KEY (detalle_pedido) REFERENCES [DROP_TABLE].Sillon(sillon_id);
-
-ALTER TABLE [DROP_TABLE].[FacturaDetalleFactura]
 ADD FOREIGN KEY (factura_id) REFERENCES [DROP_TABLE].Factura(factura_id);
 
-ALTER TABLE [DROP_TABLE].[FacturaDetalleFactura]
-ADD FOREIGN KEY (detalle_id) REFERENCES [DROP_TABLE].DetalleFactura(detalle_id);
+ALTER TABLE [DROP_TABLE].[DetalleFactura]
+ADD FOREIGN KEY (detalle_pedido) REFERENCES [DROP_TABLE].ItemPedido(item_pedido_id);
 
 COMMIT
 GO
@@ -534,6 +520,7 @@ FROM gd_esquema.Maestra
 WHERE Pedido_Estado IS NOT NULL
 GO
 
+-- 20509
 INSERT INTO [DROP_TABLE].[Pedido]
   (numero, sucursal, cliente, fecha, total, estado)
 SELECT DISTINCT m.Pedido_Numero, s.sucursal_id, c.cliente_id, m.Pedido_Fecha, m.Pedido_Total, e.estado_id
@@ -626,8 +613,8 @@ WHERE ma.material_id IS NOT NULL
 GO
 
 INSERT INTO [DROP_TABLE].[Sillon]
-  (codigo, modelo, medidas, cantidad, precio, subtotal)
-SELECT DISTINCT m.Sillon_Codigo, mo.modelo_id, me.medida_id, m.Detalle_Pedido_Cantidad, m.Detalle_Pedido_Precio, m.Detalle_Pedido_SubTotal
+  (codigo, modelo, medidas)
+SELECT DISTINCT m.Sillon_Codigo, mo.modelo_id, me.medida_id
 FROM gd_esquema.Maestra m
   LEFT JOIN DROP_TABLE.SillonModelo mo ON mo.modelo = m.Sillon_Modelo
     AND mo.modelo_codigo = m.Sillon_Modelo_Codigo
@@ -643,9 +630,10 @@ WHERE (m.Sillon_Codigo IS NOT NULL
   AND m.Factura_Numero IS NULL
 GO
 
-INSERT INTO [DROP_TABLE].[PedidoSillon]
-  (pedido_id, sillon_id)
-SELECT DISTINCT p.pedido_id, s.sillon_id
+-- 72166
+INSERT INTO [DROP_TABLE].[ItemPedido]
+  (pedido_id, sillon_id, cantidad, subtotal, precio)
+SELECT DISTINCT p.pedido_id, s.sillon_id, m.Detalle_Pedido_Cantidad, m.Detalle_Pedido_Precio, m.Detalle_Pedido_SubTotal
 FROM gd_esquema.Maestra m
 INNER JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
   AND p.fecha = m.Pedido_Fecha
@@ -656,12 +644,13 @@ INNER JOIN DROP_TABLE.Sucursal su ON su.numero = m.Sucursal_NroSucursal
   AND su.mail = m.Sucursal_mail
   AND su.sucursal_id = p.sucursal
 INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
-  AND s.cantidad = m.Detalle_Pedido_Cantidad
-  AND s.precio = m.Detalle_Pedido_Precio
-  AND s.subtotal = m.Detalle_Pedido_SubTotal
 INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
   AND mo.modelo = m.Sillon_Modelo
   AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
+LEFT JOIN DROP_TABLE.Medida me ON me.medida_alto = m.Sillon_Medida_Alto
+    AND me.medida_ancho = m.Sillon_Medida_Ancho
+    AND me.medida_precio = m.Sillon_Medida_Precio
+    AND me.medida_profundidad = m.Sillon_Medida_Profundidad
 GO
 
 INSERT INTO [DROP_TABLE].[SillonMaterial]
@@ -669,9 +658,6 @@ INSERT INTO [DROP_TABLE].[SillonMaterial]
 SELECT DISTINCT s.sillon_id, ma.material_id
 FROM gd_esquema.Maestra m
 INNER JOIN DROP_TABLE.Sillon s ON s.codigo = m.Sillon_Codigo
-  AND s.cantidad = m.Detalle_Pedido_Cantidad
-  AND s.precio = m.Detalle_Pedido_Precio
-  AND s.subtotal = m.Detalle_Pedido_SubTotal
 INNER JOIN DROP_TABLE.SillonModelo mo ON mo.modelo_codigo = m.Sillon_Modelo_Codigo
   AND mo.modelo = m.Sillon_Modelo
   AND mo.modelo_descripcion = m.Sillon_Modelo_Descripcion
@@ -706,6 +692,7 @@ WHERE Proveedor_Cuit IS NOT NULL
 ORDER BY 1;
 GO
 
+-- 17408
 INSERT INTO [DROP_TABLE].[Factura]
   (
   numero,
@@ -732,25 +719,57 @@ WHERE Factura_Numero IS NOT NULL
 ORDER BY 1;
 GO
 
+-- 61k
+-- // HERE
+SELECT DISTINCT * FROM  [DROP_TABLE].[DetalleFactura]
 INSERT INTO [DROP_TABLE].[DetalleFactura]
   (
+  factura_id,
   detalle_pedido,
   precio,
   cantidad,
   subtotal
   )
 SELECT DISTINCT
-  s.sillon_id,
-  Detalle_Factura_Precio,
-  Detalle_Factura_Cantidad,
-  Detalle_Factura_SubTotal
+  f.factura_id,
+  ip.item_pedido_id,
+  m.Detalle_Factura_Precio,
+  m.Detalle_Factura_Cantidad,
+  m.Detalle_Factura_SubTotal
 FROM gd_esquema.Maestra m
-INNER JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
-  AND p.fecha = m.Pedido_Fecha
-  AND p.total = m.Pedido_Total
-JOIN DROP_TABLE.PedidoSillon ps ON ps.pedido_id = p.pedido_id
-JOIN DROP_TABLE.Sillon s ON s.sillon_id = ps.sillon_id
-WHERE Factura_Numero IS NOT NULL
+JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
+JOIN DROP_TABLE.ItemPedido ip ON ip.pedido_id = p.pedido_id
+  AND ip.cantidad = m.Detalle_Pedido_Cantidad
+  AND ip.precio = m.Detalle_Pedido_Precio
+LEFT JOIN DROP_TABLE.Factura f ON f.numero = m.Factura_Numero
+WHERE Detalle_Factura_Cantidad IS NOT NULL
+GROUP BY f.factura_id,   ip.item_pedido_id,
+  m.Detalle_Factura_Precio,
+  m.Detalle_Factura_Cantidad,
+  m.Detalle_Factura_SubTotal
+GO
+
+SELECT Factura_Numero, Detalle_Factura_Cantidad FROM gd_esquema.Maestra
+WHERE Detalle_Factura_Precio IS NOT NULL
+-- // WIP
+
+    -- INSERT INTO GDDIENTOS.Item_Factura
+    --     (item_factura_codigo_factura,
+    --     item_factura_item_pedido_codigo, item_factura_precio_unitario,
+    --     item_factura_cantidad, item_factura_subtotal)
+    -- SELECT factura_numero, item_pedido_codigo, Detalle_Factura_Precio,
+    --     Detalle_Factura_Cantidad, Detalle_Factura_SubTotal
+    -- FROM gd_esquema.Maestra
+    --     JOIN GDDIENTOS.Item_Pedido ON item_pedido_codigo_pedido = pedido_numero
+    --         AND item_pedido_precio_unitario = detalle_factura_precio
+    --         AND item_pedido_cantidad = detalle_factura_cantidad
+    -- GROUP BY factura_numero, item_pedido_codigo, Detalle_Factura_Precio,
+    --     Detalle_Factura_Cantidad, Detalle_Factura_SubTotal
+
+
+SELECT DISTINCT pedido_numero FROM gd_esquema.Maestra
+
+
 
 INSERT INTO [DROP_TABLE].[Envio]
   (
@@ -776,6 +795,7 @@ WHERE Envio_Numero IS NOT NULL
 ORDER BY 1;
 GO
 
+-- 711
 INSERT INTO [DROP_TABLE].[Compra]
   (
   numero,
@@ -816,22 +836,4 @@ FROM gd_esquema.Maestra m
     AND mat.precio = m.Material_Precio
 WHERE Detalle_Compra_Precio IS NOT NULL
 ORDER BY 1;
-GO
-
-INSERT INTO [DROP_TABLE].[FacturaDetalleFactura]
-  (
-  factura_id,
-  detalle_id
-  )
-SELECT DISTINCT
-  f.factura_id,
-  df.detalle_id
-FROM gd_esquema.Maestra m
-JOIN DROP_TABLE.Factura f ON f.numero = m.Factura_Numero
-JOIN DROP_TABLE.Pedido p ON p.numero = m.Pedido_Numero
-JOIN DROP_TABLE.DetalleFactura df ON df.detalle_pedido = p.pedido_id
-WHERE m.Factura_Numero IS NOT NULL;
-GO
-
-COMMIT
 GO
