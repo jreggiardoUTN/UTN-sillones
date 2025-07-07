@@ -18,14 +18,19 @@ END
 GO
 
 -- Borrado de FK Constraints
+DECLARE @DropConstraints NVARCHAR(MAX) = '';
 
-DECLARE @DropConstraints NVARCHAR(max) = ''
-SELECT @DropConstraints += 'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) + '.'
-                        +  QUOTENAME(OBJECT_NAME(parent_object_id)) + ' ' + 'DROP CONSTRAINT' + QUOTENAME(name)
-FROM sys.foreign_keys
-EXECUTE sp_executesql @DropConstraints;
+SELECT @DropConstraints +=
+    'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) + '.' +
+    QUOTENAME(OBJECT_NAME(fk.parent_object_id)) + 
+    ' DROP CONSTRAINT ' + QUOTENAME(fk.name) + ';' + CHAR(13)
+FROM sys.foreign_keys fk
+WHERE OBJECT_SCHEMA_NAME(fk.parent_object_id) = 'DROP_TABLE'
+  AND OBJECT_NAME(fk.parent_object_id) LIKE 'BI_%';
+
+IF LEN(@DropConstraints) > 0
+    EXEC sp_executesql @DropConstraints;
 GO
-
 -- Borrado de funciones auxiliar si existe
 
 DROP FUNCTION IF EXISTS [DROP_TABLE].fn_GetRangoEdadId;
@@ -73,12 +78,8 @@ IF OBJECT_ID('DROP_TABLE.BI_dimension_tipo_material','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_dimension_tipo_material;
 IF OBJECT_ID('DROP_TABLE.BI_dimension_modelo_sillon','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_dimension_modelo_sillon;
-IF OBJECT_ID('DROP_TABLE.BI_dimension_pedido','U') IS NOT NULL
-  DROP TABLE [DROP_TABLE].BI_dimension_pedido;
 IF OBJECT_ID('DROP_TABLE.BI_dimension_estado_pedido','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_dimension_estado_pedido;
-IF OBJECT_ID('DROP_TABLE.BI_dimension_sucursales','U') IS NOT NULL
-  DROP TABLE [DROP_TABLE].BI_dimension_sucursales;
 IF OBJECT_ID('DROP_TABLE.BI_hechos_compras','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_hechos_compras;
 IF OBJECT_ID('DROP_TABLE.BI_hechos_envios','U') IS NOT NULL
@@ -128,7 +129,7 @@ WHERE [name] = 'BI_dimension_turnos')
 CREATE TABLE [DROP_TABLE].[BI_dimension_turnos]
 (
   turno_id INT IDENTITY(1,1) PRIMARY KEY,
-  descripcion NVARCHAR (255)
+  turno_descripcion NVARCHAR (255)
 )
 
 IF NOT EXISTS(SELECT [name]
@@ -162,15 +163,6 @@ CREATE TABLE [DROP_TABLE].[BI_dimension_estado_pedido]
 
 IF NOT EXISTS(SELECT [name]
 FROM sys.tables
-WHERE [name] = 'BI_dimension_sucursales')
-CREATE TABLE [DROP_TABLE].[BI_dimension_sucursales]
-(
-  sucursal_id INT IDENTITY(1,1) PRIMARY KEY,
-  sucursal_nombre NVARCHAR (255),
-)
-
-IF NOT EXISTS(SELECT [name]
-FROM sys.tables
 WHERE [name] = 'BI_hechos_pedidos')
 CREATE TABLE [DROP_TABLE].[BI_hechos_pedidos]
 (
@@ -179,13 +171,12 @@ CREATE TABLE [DROP_TABLE].[BI_hechos_pedidos]
   tiempo_id INT,
   sillon_modelo INT,
   turno INT,
-  sucursal_id INT,
+  sucursal_numero BIGINT,
   estado INT
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(sillon_modelo) REFERENCES [DROP_TABLE].[BI_dimension_modelo_sillon],
   FOREIGN KEY(turno) REFERENCES [DROP_TABLE].[BI_dimension_turnos],
-  FOREIGN KEY(sucursal_id) REFERENCES [DROP_TABLE].[BI_dimension_sucursales],
-  FOREIGN KEY(estado) REFERENCES [DROP_TABLE].[BI_dimension_estado_pedido],
+  FOREIGN KEY(estado) REFERENCES [DROP_TABLE].[BI_dimension_estado_pedido]
 )
 
 IF NOT EXISTS(SELECT [name]
@@ -193,16 +184,15 @@ FROM sys.tables
 WHERE [name] = 'BI_hechos_ventas')
 CREATE TABLE [DROP_TABLE].[BI_hechos_ventas]
 (
-  hechos_facturacion_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
+  ventas_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
   total_facturacion DECIMAL (18, 2),
   tiempo_id INT,
   ubicacion_id INT,
-  sucursal_id INT,
+  sucursal_numero BIGINT,
   rango_etario_cliente INT,
   pedido DECIMAL (18, 0),
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(ubicacion_id) REFERENCES [DROP_TABLE].[BI_dimension_ubicaciones],
-  FOREIGN KEY(sucursal_id) REFERENCES [DROP_TABLE].[BI_dimension_sucursales],
   FOREIGN KEY(rango_etario_cliente) REFERENCES [DROP_TABLE].[BI_dimension_rangos_edades],
   FOREIGN KEY(pedido) REFERENCES [DROP_TABLE].[BI_hechos_pedidos],
 )
@@ -212,15 +202,14 @@ FROM sys.tables
 WHERE [name] = 'BI_hechos_compras')
 CREATE TABLE [DROP_TABLE].[BI_hechos_compras]
 (
-  hechos_compras_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
+  compras_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
   total_compra DECIMAL (18, 2),
   tiempo_id INT,
   ubicacion_id INT,
-  sucursal_id INT,
+  sucursal_numero BIGINT,
   tipo_material INT,
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(ubicacion_id) REFERENCES [DROP_TABLE].[BI_dimension_ubicaciones],
-  FOREIGN KEY(sucursal_id) REFERENCES [DROP_TABLE].[BI_dimension_sucursales],
   FOREIGN KEY(tipo_material) REFERENCES [DROP_TABLE].[BI_dimension_tipo_material],
 )
 
@@ -229,7 +218,7 @@ FROM sys.tables
 WHERE [name] = 'BI_hechos_envios')
 CREATE TABLE [DROP_TABLE].[BI_hechos_envios]
 (
-  hechos_envios_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
+  envios_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
   tiempo_id INT,
   ubicacion_id INT,
   estado_envio NVARCHAR(255),
@@ -281,15 +270,15 @@ BEGIN
   IF @hora BETWEEN 8 AND 14
 		SELECT @turno_id = turno_id
   FROM [DROP_TABLE].BI_dimension_turnos AS T
-  WHERE T.descripcion = '08:00 - 14:00'
+  WHERE T.turno_descripcion = '08:00 - 14:00'
 	ELSE IF @hora BETWEEN 14 AND 20
 		SELECT @turno_id = turno_id
   FROM [DROP_TABLE].BI_dimension_turnos AS T
-  WHERE T.descripcion = '14:00 - 20:00'
+  WHERE T.turno_descripcion = '14:00 - 20:00'
 	ELSE
 		SELECT @turno_id = turno_id
   FROM [DROP_TABLE].BI_dimension_turnos AS T
-  WHERE T.descripcion = 'Otros'
+  WHERE T.turno_descripcion = 'Otros'
   RETURN @turno_id;
 END
 GO
@@ -302,32 +291,32 @@ GO
 
 CREATE FUNCTION [DROP_TABLE].fn_GetTiempoId(@fecha DATETIME2) RETURNS INT AS
 BEGIN
-	DECLARE @anio INT,
+  DECLARE @anio INT,
 			@mes INT,
 			@cuatrimestre INT,
 			@id_tiempo INT
 
-	SET @anio = DATEPART(YEAR, @fecha)
-	SET @mes = DATEPART(MONTH, @fecha)
-	SET @cuatrimestre = [DROP_TABLE].fn_GetCuatrimestre(@fecha)
+  SET @anio = DATEPART(YEAR, @fecha)
+  SET @mes = DATEPART(MONTH, @fecha)
+  SET @cuatrimestre = [DROP_TABLE].fn_GetCuatrimestre(@fecha)
 
-	SELECT @id_tiempo = tiempo_id
-		FROM DROP_TABLE.BI_dimension_tiempos
-		WHERE anio = @anio AND mes = @mes AND cuatrimestre = @cuatrimestre
+  SELECT @id_tiempo = tiempo_id
+  FROM DROP_TABLE.BI_dimension_tiempos
+  WHERE anio = @anio AND mes = @mes AND cuatrimestre = @cuatrimestre
 
-	RETURN @id_tiempo
+  RETURN @id_tiempo
 END
 GO
 
 CREATE FUNCTION [DROP_TABLE].fn_GetUbicacionId(@localidad NVARCHAR(255), @provincia NVARCHAR(255)) RETURNS INT AS
 BEGIN
-    DECLARE @ubicacion INT
+  DECLARE @ubicacion INT
 
-  	SELECT @ubicacion = U.ubicacion_id
-		FROM [DROP_TABLE].BI_dimension_ubicaciones U
-		WHERE U.localidad_descripcion = @localidad AND U.provincia_descripcion = @provincia
+  SELECT @ubicacion = U.ubicacion_id
+  FROM [DROP_TABLE].BI_dimension_ubicaciones U
+  WHERE U.localidad_descripcion = @localidad AND U.provincia_descripcion = @provincia
 
-    RETURN @ubicacion
+  RETURN @ubicacion
 END
 GO
 
@@ -346,24 +335,27 @@ GO
 
 BEGIN TRANSACTION
 
-INSERT INTO [DROP_TABLE].[BI_dimension_tiempos](
+INSERT INTO [DROP_TABLE].[BI_dimension_tiempos]
+  (
   mes,
   cuatrimestre,
   anio
-)
+  )
 SELECT DISTINCT MONTH(fecha), [DROP_TABLE].fn_GetCuatrimestre(fecha), YEAR(fecha)
 FROM [DROP_TABLE].Factura
 ORDER BY 1
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_turnos](descripcion)
+INSERT INTO [DROP_TABLE].[BI_dimension_turnos]
+  (turno_descripcion)
 VALUES
   ('08:00 - 14:00'),
   ('14:00 - 20:00'),
   ('Otros')
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_rangos_edades](rango_descripcion)
+INSERT INTO [DROP_TABLE].[BI_dimension_rangos_edades]
+  (rango_descripcion)
 VALUES
   ('< 25'),
   ('25 - 35'),
@@ -371,46 +363,51 @@ VALUES
   ('> 50')
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_ubicaciones](
+INSERT INTO [DROP_TABLE].[BI_dimension_ubicaciones]
+  (
   localidad_descripcion,
   provincia_descripcion
-)
+  )
 SELECT L.descripcion, P.descripcion
 FROM [DROP_TABLE].Localidad L
-JOIN [DROP_TABLE].Provincia P ON L.provincia = P.provincia_id
+  JOIN [DROP_TABLE].Provincia P ON L.provincia = P.provincia_id
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_tipo_material](
+INSERT INTO [DROP_TABLE].[BI_dimension_tipo_material]
+  (
   tipo_descripcion
-)
+  )
 SELECT DISTINCT descripcion
 FROM [DROP_TABLE].TipoMaterial
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_modelo_sillon](
+INSERT INTO [DROP_TABLE].[BI_dimension_modelo_sillon]
+  (
   modelo,
   modelo_codigo,
   modelo_descripcion
-)
+  )
 SELECT DISTINCT modelo, modelo_codigo, modelo_descripcion
 FROM [DROP_TABLE].SillonModelo
 GO
 
-INSERT INTO [DROP_TABLE].[BI_dimension_estado_pedido](
+INSERT INTO [DROP_TABLE].[BI_dimension_estado_pedido]
+  (
   estado_descripcion
-)
+  )
 SELECT DISTINCT descripcion
 FROM [DROP_TABLE].Estado
 GO
 
-INSERT INTO [DROP_TABLE].[BI_hechos_pedidos](
+INSERT INTO [DROP_TABLE].[BI_hechos_pedidos]
+  (
   numero,
   tiempo_id,
   sillon_modelo,
   turno,
-  sucursal_id,
+  sucursal_numero,
   estado
-)
+  )
 SELECT
   P.numero,
   [DROP_TABLE].fn_GetTiempoId(P.fecha),
@@ -419,18 +416,19 @@ SELECT
   P.sucursal,
   P.estado
 FROM [DROP_TABLE].Pedido P
-LEFT JOIN [DROP_TABLE].PedidoSillon PS ON PS.pedido_id = P.pedido_id
-LEFT JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
-LEFT JOIN [DROP_TABLE].BI_dimension_modelo_sillon DM ON DM.modelo_id = PS.sillon_id
+  LEFT JOIN [DROP_TABLE].ItemPedido PS ON PS.pedido_id = P.pedido_id
+  LEFT JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
+  LEFT JOIN [DROP_TABLE].BI_dimension_modelo_sillon DM ON DM.modelo_id = PS.sillon_id
 GO
 
-INSERT INTO [DROP_TABLE].[BI_hechos_ventas] (
+INSERT INTO [DROP_TABLE].[BI_hechos_ventas]
+  (
   total_facturacion,
   tiempo_id,
   ubicacion_id,
-  sucursal_id,
+  sucursal_numero,
   rango_etario_cliente
-)
+  )
 SELECT
   F.total,
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
@@ -438,44 +436,58 @@ SELECT
   F.sucursal,
   [DROP_TABLE].fn_GetRangoEdadId(C.fecha_nacimiento)
 FROM [DROP_TABLE].Factura F
-LEFT JOIN [DROP_TABLE].Sucursal S ON S.sucursal_id = F.sucursal
-LEFT JOIN [DROP_TABLE].Localidad L ON L.localidad_id = S.localidad
-LEFT JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
-JOIN [DROP_TABLE].BI_dimension_ubicaciones U
+  LEFT JOIN [DROP_TABLE].Sucursal S ON S.sucursal_id = F.sucursal
+  LEFT JOIN [DROP_TABLE].Localidad L ON L.localidad_id = S.localidad
+  LEFT JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
+  JOIN [DROP_TABLE].BI_dimension_ubicaciones U
   ON L.descripcion = U.localidad_descripcion
-  AND P.descripcion = U.provincia_descripcion
-JOIN [DROP_TABLE].Cliente C ON C.cliente_id = F.cliente
+    AND P.descripcion = U.provincia_descripcion
+  JOIN [DROP_TABLE].Cliente C ON C.cliente_id = F.cliente
 GO
 
--- INSERT INTO [DROP_TABLE].[BI_hechos_compras](
---   total_compra,
---   tiempo_id,
---   ubicacion_id,
---   sucursal_id,
---   tipo_material
--- )
--- SELECT
---   C.total,
---   [DROP_TABLE].fn_GetTiempoId(C.fecha_compra),
---   [DROP_TABLE].fn_GetUbicacionId(L.descripcion, P.descripcion),
---   C.sucursal,
---   M.tipo_material
--- FROM [DROP_TABLE].Compra C
--- LEFT JOIN [DROP_TABLE].Sucursal S ON S.sucursal_id = C.sucursal
--- LEFT JOIN [DROP_TABLE].Localidad L ON L.localidad_id = S.localidad
--- LEFT JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
+INSERT INTO [DROP_TABLE].[BI_hechos_compras]
+  (
+  total_compra,
+  tiempo_id,
+  ubicacion_id,
+  sucursal_numero,
+  tipo_material
+  )
+SELECT
+  C.total AS total_compra,
+  [DROP_TABLE].fn_GetTiempoId(C.fecha_compra) AS tiempo_id,
+  [DROP_TABLE].fn_GetUbicacionId(L.descripcion, P.descripcion) AS ubicacion_id,
+  C.sucursal AS sucursal_id,
+  TM.tipo_id AS tipo_material
+FROM [DROP_TABLE].[Compra] C
+  JOIN [DROP_TABLE].[DetalleCompra] DC
+  ON DC.detalle_compra_id = C.compra_id
+  JOIN [DROP_TABLE].[Material] M
+  ON M.material_id = DC.material_id
+  JOIN [DROP_TABLE].[TipoMaterial] TM
+  ON TM.tipo_id = M.tipo
+  JOIN [DROP_TABLE].[Sucursal] S
+  ON S.sucursal_id = C.sucursal
+  JOIN [DROP_TABLE].[Localidad] L
+  ON L.localidad_id = S.localidad
+  JOIN [DROP_TABLE].[Provincia] P
+  ON P.provincia_id = L.provincia
+WHERE C.total IS NOT NULL
+  AND C.fecha_compra IS NOT NULL
+  AND L.descripcion IS NOT NULL
+  AND P.descripcion IS NOT NULL
+  AND TM.tipo_id IS NOT NULL;
+GO
 
--- Como se vincula Compra con detalle compra?
--- GO
-
-INSERT INTO [DROP_TABLE].[BI_hechos_envios](
+INSERT INTO [DROP_TABLE].[BI_hechos_envios]
+  (
   tiempo_id,
   ubicacion_id,
   estado_envio,
   envio_fecha_programada,
   envio_fecha_entrega,
   costo
-)
+  )
 SELECT DISTINCT
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
   U.ubicacion_id,
@@ -484,19 +496,18 @@ SELECT DISTINCT
   E.fecha_entrega,
   SUM(E.total)
 FROM [DROP_TABLE].Envio E
-LEFT JOIN [DROP_TABLE].Factura F ON F.factura_id = E.factura
-JOIN [DROP_TABLE].Cliente Cl ON Cl.cliente_id = F.cliente
-JOIN [DROP_TABLE].Localidad L ON L.localidad_id = Cl.localidad
-JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
-JOIN [DROP_TABLE].BI_dimension_ubicaciones U
+  LEFT JOIN [DROP_TABLE].Factura F ON F.factura_id = E.factura
+  JOIN [DROP_TABLE].Cliente Cl ON Cl.cliente_id = F.cliente
+  JOIN [DROP_TABLE].Localidad L ON L.localidad_id = Cl.localidad
+  JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
+  JOIN [DROP_TABLE].BI_dimension_ubicaciones U
   ON L.descripcion = U.localidad_descripcion
-  AND P.descripcion = U.provincia_descripcion
-JOIN [DROP_TABLE].FacturaDetalleFactura FDF ON FDF.factura_id = F.factura_id
-JOIN [DROP_TABLE].DetalleFactura DF ON DF.detalle_id = FDF.detalle_id
-JOIN [DROP_TABLE].Sillon S ON S.sillon_id = DF.detalle_pedido
-JOIN [DROP_TABLE].PedidoSillon PS ON PS.sillon_id = S.sillon_id
-JOIN [DROP_TABLE].Pedido Pe ON Pe.pedido_id = PS.pedido_id
-JOIN [DROP_TABLE].Estado Es ON Es.estado_id = Pe.estado
+    AND P.descripcion = U.provincia_descripcion
+  JOIN [DROP_TABLE].DetalleFactura DF ON DF.factura_id = F.factura_id
+  JOIN [DROP_TABLE].ItemPedido PS ON PS.pedido_id = DF.detalle_pedido
+  JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
+  JOIN [DROP_TABLE].Pedido Pe ON Pe.pedido_id = PS.pedido_id
+  JOIN [DROP_TABLE].Estado Es ON Es.estado_id = Pe.estado
 GROUP BY 
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
   U.ubicacion_id,
@@ -508,28 +519,33 @@ GO
 -- ================= Vistas =============================
 
 -- Punto 9
-CREATE VIEW [DROP_TABLE].v_porcentaje_cumplimiento_envios AS
-SELECT
-  T.anio AS Anio,
-  T.mes AS Mes,
-  (SUM([DROP_TABLE].fn_EnvioCumplido(HE.envio_fecha_entrega, HE.envio_fecha_programada)) / COUNT(1)) * 100 AS PorcentajeCumplimientoEnvio
-FROM [DROP_TABLE].BI_hechos_envios HE
-INNER JOIN [DROP_TABLE].BI_dimension_tiempos T ON T.tiempo_id = HE.tiempo_id
-GROUP BY t.anio, t.mes;
+CREATE VIEW [DROP_TABLE].v_porcentaje_cumplimiento_envios
+AS
+  SELECT
+    T.anio AS Anio,
+    T.mes AS Mes,
+    (SUM([DROP_TABLE].fn_EnvioCumplido(HE.envio_fecha_entrega, HE.envio_fecha_programada)) / COUNT(1)) * 100 AS PorcentajeCumplimientoEnvio
+  FROM [DROP_TABLE].BI_hechos_envios HE
+    INNER JOIN [DROP_TABLE].BI_dimension_tiempos T ON T.tiempo_id = HE.tiempo_id
+  GROUP BY t.anio, t.mes;
 GO
 
 -- Punto 10
-CREATE VIEW [DROP_TABLE].v_top3_localidades_costo_envio AS
-SELECT
+CREATE VIEW [DROP_TABLE].v_top3_localidades_costo_envio
+AS
+  SELECT
     localidad_descripcion,
     total_costo_envio
-FROM (
+  FROM (
     SELECT TOP 5
-        DU.localidad_descripcion,
-        SUM(HE.costo) AS total_costo_envio
+      DU.localidad_descripcion,
+      SUM(HE.costo) AS total_costo_envio
     FROM [DROP_TABLE].BI_hechos_envios HE
-    JOIN [DROP_TABLE].BI_dimension_ubicaciones DU ON HE.ubicacion_id = DU.ubicacion_id
+      JOIN [DROP_TABLE].BI_dimension_ubicaciones DU ON HE.ubicacion_id = DU.ubicacion_id
     GROUP BY DU.localidad_descripcion
     ORDER BY SUM(HE.costo) DESC
 ) AS subquery;
+GO
+
+COMMIT
 GO

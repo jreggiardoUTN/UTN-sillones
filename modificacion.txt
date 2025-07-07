@@ -1,0 +1,16 @@
+FacturaDetalleFactura
+Borrado tabla intermedia
+
+PedidoSillon
+Actualizacion nombre a ItemPedido
+Actualizacion atributos, se agregan: cantidad, subtotal, precio
+
+DetalleFactura
+Vinculacion con FK Factura
+Vinculacion con FK ItemPedido
+
+Sillon
+Actualizacion atributos, se quitan: cantidad, subtotal, precio
+
+DetalleCompra
+Vinculacion con FK Compra

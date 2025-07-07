@@ -19,11 +19,15 @@ GO
 
 -- Borrado de FK Constraints
 
-DECLARE @DropConstraints NVARCHAR(max) = ''
-SELECT @DropConstraints += 'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) + '.'
-                        +  QUOTENAME(OBJECT_NAME(parent_object_id)) + ' ' + 'DROP CONSTRAINT' + QUOTENAME(name)
-FROM sys.foreign_keys
-EXECUTE sp_executesql @DropConstraints;
+DECLARE @DropConstraints NVARCHAR(MAX) = '';
+SELECT @DropConstraints +=
+    'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) + '.' +
+    QUOTENAME(OBJECT_NAME(fk.parent_object_id)) + 
+    ' DROP CONSTRAINT ' + QUOTENAME(fk.name) + ';' + CHAR(13)
+FROM sys.foreign_keys fk;
+
+IF LEN(@DropConstraints) > 0
+    EXEC sp_executesql @DropConstraints;
 GO
 
 -- Borrado de tablas si existen en caso que el schema exista
@@ -724,7 +728,6 @@ INSERT INTO [DROP_TABLE].[DetalleFactura]
   cantidad,
   subtotal
   )
-
 SELECT
   f.factura_id,
   ip.item_pedido_id,
@@ -806,4 +809,7 @@ FROM gd_esquema.Maestra m
     AND mat.precio = m.Material_Precio
 WHERE Detalle_Compra_Precio IS NOT NULL
 ORDER BY 1;
+GO
+
+COMMIT
 GO

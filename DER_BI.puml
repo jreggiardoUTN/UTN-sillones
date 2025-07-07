@@ -3,72 +3,109 @@
 ' avoid problems with angled crows feet
 skinparam linetype polyline
 skinparam linetype ortho
+left to right direction
 
 entity "BI_dimension_tiempos" {
-    *tiempo_id: int <<generated>>
+    *tiempo_id: INT <<generated>>
     --
-    mes: int
-    cuatrimestre: int
-    anio: int
+    mes: INT
+    cuatrimestre: INT
+    anio: INT
 }
 
 entity "BI_dimension_ubicaciones" {
-    *ubicacion_id: int <<generated>>
+    *ubicacion_id: INT <<generated>>
     --
-    localidad_descripcion: nvarchar(255)
-    provincia_descripcion: nvarchar(255)
+    localidad_descripcion: NVARCHAR(255)
+    provincia_descripcion: NVARCHAR(255)
 }
 
 entity "BI_dimension_rangos_edades" {
-    *rango_id: int <<generated>>
+    *rango_id: INT <<generated>>
     --
-    rango_descripcion: nvarchar(255)
+    rango_descripcion: NVARCHAR(255)
 }
 
 entity "BI_dimension_turnos" {
-    *turno_id: int <<generated>>
+    *turno_id: INT <<generated>>
     --
-    turno_descripcion: nvarchar(255)
+    turno_descripcion: NVARCHAR(255)
 }
 
 entity "BI_dimension_tipo_material" {
-    *tipo_id: int <<generated>>
+    *tipo_id: INT <<generated>>
     --
-    tipo_descripcion: nvarchar(255)
+    tipo_descripcion: NVARCHAR(255)
 }
 
 entity "BI_dimension_modelo_sillon" {
-    *modelo_id: int <<generated>>
+    *modelo_id: INT <<generated>>
     --
-    modelo: nvarchar(255)
-    modelo_codigo: bigint
-    modelo_descripcion: nvarchar(255)
+    modelo: NVARCHAR(255)
+    modelo_codigo: BIGINT
+    modelo_descripcion: NVARCHAR(255)
 }
 
 entity "BI_dimension_estado_pedido" {
-    *estado_id: int <<generated>>
+    *estado_id: INT <<generated>>
     --
-    estado_descripcion: nvarchar(255)
+    estado_descripcion: NVARCHAR(255)
+}
+
+entity "BI_hechos_pedidos" {
+    *pedido_id: DECIMAL (18, 0) <<generated>>
+    --
+    numero: DECIMAL (18, 0)
+    *tiempo_id: INT
+    *sillon_modelo: INT
+    *turno: INT
+    sucursal_numero: BIGINT
+    *estado: INT
 }
 
 entity "BI_hechos_ventas" {
-    *venta_id: int <<generated>>
+    *ventas_id: DECIMAL (18, 0) <<generated>>
     --
+    total_facturacion: DECIMAL (18, 2)
+    *tiempo_id: INT
+    *ubicacion_id: INT
+    sucursal_numero: BIGINT
+    *rango_etario_cliente: INT
+    *pedido: DECIMAL (18, 0)
 }
 
-entity "BI_hecho_compra" {
-    *compra_id: int <<generated>>
+entity "BI_hechos_compras" {
+    *compras_id: DECIMAL (18, 0) <<generated>>
     --
+    total_compra: DECIMAL (18, 2)
+    *tiempo_id: INT
+    *ubicacion_id: INT
+    sucursal_numero: BIGINT
+    *tipo_material: INT
 }
 
 entity "BI_hechos_envios" {
-    *envio_id: int <<generated>>
+    *envio_id: DECIMAL(18,2) <<generated>>
     --
+    tiempo_id INT
+    ubicacion_id INT
+    estado_envio NVARCHAR(255)
+    envio_fecha_programada DATETIME2(2)
+    envio_fecha_entrega DATETIME2(2)
+    costo DECIMAL(18,2)
 }
 
-' Localidad }|--|| Provincia
-' Cliente }|--o| Localidad
-' Pedido ||-u-|{ Estado
-' Sillon }|-l-|| SillonModelo
+BI_hechos_pedidos ||-u-|| BI_dimension_tiempos
+BI_hechos_pedidos ||--|| BI_dimension_turnos
+BI_hechos_pedidos ||-u-|| BI_dimension_modelo_sillon
+BI_hechos_pedidos ||--|| BI_dimension_estado_pedido
+BI_hechos_ventas ||-u-|| BI_dimension_tiempos
+BI_hechos_ventas ||--|| BI_dimension_ubicaciones
+BI_hechos_ventas ||-u-|| BI_dimension_rangos_edades
+BI_hechos_compras ||-u-|| BI_dimension_tiempos
+BI_hechos_compras ||--|| BI_dimension_ubicaciones
+BI_hechos_compras ||--|| BI_dimension_tipo_material
+BI_hechos_envios ||-u-|| BI_dimension_tiempos
+BI_hechos_envios ||--|| BI_dimension_ubicaciones
 
 @enduml

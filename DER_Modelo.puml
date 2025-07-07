@@ -14,7 +14,6 @@ entity "Sucursal" {
     *localidad: decimal(18,0) <<FK>>
 }
 
-
 entity "Cliente" {
     *cliente_id: decimal(18,0) <<generated>>
     --
@@ -45,10 +44,14 @@ entity "Estado" {
     descripcion: nvarchar(255)
 }
 
-entity "PedidoSillon" {
-    *pedido_id: decimal(18,0) <<PK, FK>>
-    *sillon_id: decimal(18,0) <<PK, FK>>
+entity "ItemPedido" {
+    *item_pedido_id: decimal(18,0) <<PK>>
     --
+    *pedido_id: decimal(18,0) <<FK>>
+    *sillon_id: decimal(18,0) <<FK>>
+    cantidad: bigint
+    subtotal: decimal(18,2)
+    precio: decimal(18,2)
 }
 
 entity "Sillon" {
@@ -57,9 +60,6 @@ entity "Sillon" {
     codigo: bigint
     *modelo: decimal(18,0) <<FK>>
     *medidas: int <<FK>>
-    cantidad: bigint
-    precio: decimal(18,2)
-    subtotal: decimal(18,2)
 }
 
 entity "Medida" {
@@ -143,17 +143,11 @@ entity "Factura" {
     total: decimal(38,2)
 }
 
-entity "FacturaDetalleFactura" {
-    *factura_id: decimal(18,0) <<PK, FK>>
-    *detalle_id: decimal(18,0) <<PK, FK>>
-    --
-}
-
-
 entity "DetalleFactura" {
     *detalle_id: decimal(18,0) <<generated>>
     --
-    detalle_pedido: decimal(18,0) <<FK>>
+    *factura_id: decimal(18,0) <<FK>>
+    *detalle_pedido: decimal(18,0) <<FK>>
     precio: decimal(18,2)
     cantidad: decimal(18,0)
     subtotal: decimal(18,2)
@@ -196,6 +190,7 @@ entity "Compra" {
 entity "DetalleCompra" {
     *detalle_compra_id: decimal(18,0) <<generated>>
     --
+    *compra: decimal(18,0) <<FK>>
     *material_id: decimal(18,0) <<FK>>
     precio_unitario: decimal(18,2)
     cantidad: decimal(18,0)
@@ -222,8 +217,8 @@ Proveedor }|--o| Localidad
 Sucursal }|--o| Localidad
 Pedido }|--|| Sucursal
 Pedido }|--|| Cliente
-Pedido ||--|{ PedidoSillon
-PedidoSillon }|--|| Sillon
+Pedido ||--|{ ItemPedido
+ItemPedido }|--|| Sillon
 Pedido ||-u-|{ Estado
 Sillon }|-l-|| SillonModelo
 Sillon }|--|| Medida
@@ -235,9 +230,8 @@ Material ||--|| Relleno
 Material ||--|| Tela
 Factura }|--|| Cliente
 Factura }|--|| Sucursal
-Factura ||--|{ FacturaDetalleFactura
-FacturaDetalleFactura }|--|| DetalleFactura
-DetalleFactura ||--|| Sillon
+Factura ||--|{ DetalleFactura
+DetalleFactura ||--|| ItemPedido
 Envio ||--|| Factura
 Compra }|--|| Proveedor
 Compra }|--|| Sucursal
