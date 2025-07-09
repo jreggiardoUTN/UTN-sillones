@@ -66,22 +66,24 @@ entity "BI_hechos_pedidos" {
 entity "BI_hechos_ventas" {
     *ventas_id: DECIMAL (18, 0) <<generated>>
     --
-    total_facturacion: DECIMAL (18, 2)
     *tiempo_id: INT
-    *ubicacion_id: INT
     sucursal_numero: BIGINT
+    *ubicacion_id: INT
     *rango_etario_cliente: INT
-    *pedido: DECIMAL (18, 0)
+    *sillon_modelo: INT
+    cantidad: BIGINT
+    total_facturacion: DECIMAL (18, 2)
 }
 
 entity "BI_hechos_compras" {
     *compras_id: DECIMAL (18, 0) <<generated>>
     --
-    total_compra: DECIMAL (18, 2)
     *tiempo_id: INT
-    *ubicacion_id: INT
     sucursal_numero: BIGINT
+    *ubicacion_id: INT
     *tipo_material: INT
+    cantidad: BIGINT
+    total_compra: DECIMAL (18, 2)
 }
 
 entity "BI_hechos_envios" {
