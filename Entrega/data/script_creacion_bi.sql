@@ -570,13 +570,14 @@ AS
   SELECT DISTINCT
     CAST(SUM(ISNULL(f.total_facturacion, 0)) / SUM(ISNULL(f.cantidad, 0)) AS DECIMAL(18,2)) AS promedio_factura,
     u.provincia_descripcion AS provincia,
-    t.cuatrimestre AS cuatrimestre
+    t.mes,
+    t.anio
   FROM [DROP_TABLE].BI_hechos_facturacion f
   JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = f.ubicacion_id
   JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_id
   GROUP BY
     u.provincia_descripcion,
-    t.cuatrimestre,
+    t.mes,
     t.anio
 GO
 
