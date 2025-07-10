@@ -226,11 +226,12 @@ CREATE TABLE [DROP_TABLE].[BI_hechos_envios]
   envios_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
   tiempo_id INT, -- FK
   ubicacion_id INT, -- FK
-  estado_envio NVARCHAR(255),
+  estado_envio INT, -- FK
   envio_fecha_programada DATETIME2(2),
   envio_fecha_entrega DATETIME2(2),
   costo DECIMAL(18,2),
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
+  FOREIGN KEY(estado_envio) REFERENCES [DROP_TABLE].[BI_dimension_estado_pedido],
   FOREIGN KEY(ubicacion_id) REFERENCES [DROP_TABLE].[BI_dimension_ubicaciones],
 )
 
@@ -328,7 +329,7 @@ GO
 CREATE FUNCTION [DROP_TABLE].fn_EnvioCumplido(@fechaEntregado DATETIME2, @fechaProgramado DATETIME) RETURNS INT AS
 BEGIN
   DECLARE @Cumplido INT;
-  IF TRY_CAST(@fechaEntregado AS DATE) <= TRY_CAST(@fechaEntregado AS DATE)
+  IF TRY_CAST(@fechaEntregado AS DATE) <= TRY_CAST(@fechaProgramado AS DATE)
 	SET @Cumplido = 1
   ELSE
     SET @Cumplido = 0
@@ -513,31 +514,29 @@ INSERT INTO [DROP_TABLE].[BI_hechos_envios]
   costo
   )
 SELECT DISTINCT
-  [DROP_TABLE].fn_GetTiempoId(F.fecha),
-  U.ubicacion_id,
-  Es.descripcion,
-  E.fecha_programada,
-  E.fecha_entrega,
-  SUM(E.total)
+  [DROP_TABLE].fn_GetTiempoId(f.fecha),
+  [DROP_TABLE].fn_GetUbicacionId(l.descripcion, p.descripcion),
+  es.estado_id,
+  e.fecha_programada,
+  e.fecha_entrega,
+  SUM(e.total)
 FROM [DROP_TABLE].Envio E
-  LEFT JOIN [DROP_TABLE].Factura F ON F.factura_id = E.factura
-  JOIN [DROP_TABLE].Cliente Cl ON Cl.cliente_id = F.cliente
-  JOIN [DROP_TABLE].Localidad L ON L.localidad_id = Cl.localidad
-  JOIN [DROP_TABLE].Provincia P ON P.provincia_id = L.provincia
-  JOIN [DROP_TABLE].BI_dimension_ubicaciones U
-  ON L.descripcion = U.localidad_descripcion
-    AND P.descripcion = U.provincia_descripcion
-  JOIN [DROP_TABLE].DetalleFactura DF ON DF.factura_id = F.factura_id
-  JOIN [DROP_TABLE].ItemPedido PS ON PS.pedido_id = DF.detalle_pedido
-  JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
-  JOIN [DROP_TABLE].Pedido Pe ON Pe.pedido_id = PS.pedido_id
-  JOIN [DROP_TABLE].Estado Es ON Es.estado_id = Pe.estado
-GROUP BY 
+  LEFT JOIN [DROP_TABLE].Factura F ON F.factura_id = e.factura
+  JOIN [DROP_TABLE].Sucursal s ON s.sucursal_id = f.sucursal
+  JOIN [DROP_TABLE].Localidad l ON l.localidad_id = s.localidad
+  JOIN [DROP_TABLE].Provincia p ON p.provincia_id = l.provincia
+  JOIN [DROP_TABLE].Cliente c ON c.cliente_id = f.cliente
+  JOIN [DROP_TABLE].Pedido pe ON pe.pedido_id = c.cliente_id
+  JOIN [DROP_TABLE].Estado es ON es.estado_id = pe.estado
+GROUP BY
+  f.numero,
+  e.numero,
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
-  U.ubicacion_id,
-	Es.descripcion,
-	E.fecha_programada,
-	E.fecha_entrega
+  F.fecha,
+  [DROP_TABLE].fn_GetUbicacionId(l.descripcion, p.descripcion),
+  es.estado_id,
+	e.fecha_programada,
+	e.fecha_entrega
 GO
 
 COMMIT
@@ -590,20 +589,20 @@ AS
       m.modelo_descripcion,
       u.ubicacion_id,
       e.rango_descripcion,
-      SUM(v.total_facturacion) AS total_facturacion,
+      SUM(f.total_facturacion) AS total_facturacion,
       ROW_NUMBER() OVER (
         PARTITION BY
           t.anio,
           t.cuatrimestre,
           u.ubicacion_id,
           e.rango_descripcion
-        ORDER BY SUM(v.total_facturacion) DESC
+        ORDER BY SUM(f.total_facturacion) DESC
       ) AS ranking_ventas
-    FROM [DROP_TABLE].BI_hechos_ventas v
-    JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = v.tiempo_facturacion
-    JOIN [DROP_TABLE].BI_dimension_modelo_sillon m ON m.modelo_id = v.sillon_modelo
-    JOIN [DROP_TABLE].BI_dimension_rangos_edades e ON e.rango_id = v.rango_etario_cliente
-    JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = v.ubicacion_id
+    FROM [DROP_TABLE].BI_hechos_facturacion f
+    JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_id
+    JOIN [DROP_TABLE].BI_dimension_modelo_sillon m ON m.modelo_id = f.sillon_modelo
+    JOIN [DROP_TABLE].BI_dimension_rangos_edades e ON e.rango_id = f.rango_etario_cliente
+    JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = f.ubicacion_id
     GROUP BY
       t.anio,
       t.cuatrimestre,
@@ -705,10 +704,13 @@ AS
   SELECT
     t.anio AS Anio,
     t.mes AS Mes,
-    (SUM([DROP_TABLE].fn_EnvioCumplido(e.envio_fecha_entrega, e.envio_fecha_programada)) / COUNT(1)) * 100 AS PorcentajeCumplimientoEnvio
+    (SUM([DROP_TABLE].fn_EnvioCumplido(e.envio_fecha_entrega, e.envio_fecha_programada)) * 100 / COUNT(1)) AS PorcentajeCumplimientoEnvio
   FROM [DROP_TABLE].BI_hechos_envios e
-  INNER JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = e.tiempo_id
-  GROUP BY t.anio, t.mes;
+  JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = e.tiempo_id
+  JOIN [DROP_TABLE].BI_dimension_estado_pedido es ON es.estado_id = e.estado_envio
+  WHERE es.estado_descripcion = 'ENTREGADO'
+  GROUP BY t.anio, t.mes
+ORDER BY 3
 GO
 
 -- Punto 10
