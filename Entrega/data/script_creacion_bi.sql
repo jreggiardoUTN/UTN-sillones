@@ -565,19 +565,19 @@ AS
 GO
 
 -- Punto 2
-CREATE VIEW [DROP_TABLE].v_factura_promedio_mensual
+CREATE VIEW [DROP_TABLE].v_factura_promedio
 AS
   SELECT DISTINCT
     CAST(SUM(ISNULL(f.total_facturacion, 0)) / SUM(ISNULL(f.cantidad, 0)) AS DECIMAL(18,2)) AS promedio_factura,
     u.provincia_descripcion AS provincia,
-    t.mes,
+    t.cuatrimestre,
     t.anio
   FROM [DROP_TABLE].BI_hechos_facturacion f
   JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = f.ubicacion_id
   JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_id
   GROUP BY
     u.provincia_descripcion,
-    t.mes,
+    t.cuatrimestre,
     t.anio
 GO
 
