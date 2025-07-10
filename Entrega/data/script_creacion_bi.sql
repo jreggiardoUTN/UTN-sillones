@@ -170,12 +170,12 @@ CREATE TABLE [DROP_TABLE].[BI_hechos_pedidos]
 (
   pedido_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
   numero DECIMAL (18, 0),
-  tiempo_id INT,
-  sillon_modelo INT,
-  turno INT,
+  tiempo_id INT, -- FK
+  sillon_modelo INT, -- FK
+  turno INT, -- FK
   sucursal_numero BIGINT,
-  estado INT
-    FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
+  estado INT -- FK
+  FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(sillon_modelo) REFERENCES [DROP_TABLE].[BI_dimension_modelo_sillon],
   FOREIGN KEY(turno) REFERENCES [DROP_TABLE].[BI_dimension_turnos],
   FOREIGN KEY(estado) REFERENCES [DROP_TABLE].[BI_dimension_estado_pedido]
@@ -186,13 +186,13 @@ FROM sys.tables
 WHERE [name] = 'BI_hechos_facturacion')
 CREATE TABLE [DROP_TABLE].[BI_hechos_facturacion]
 (
-  ventas_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
-  tiempo_id INT,
+  facturacion_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
+  tiempo_id INT, -- FK
   dias_desde_pedido_a_factura INT,
   sucursal_numero BIGINT,
-  sillon_modelo INT,
-  ubicacion_id INT,
-  rango_etario_cliente INT,
+  sillon_modelo INT, -- FK
+  ubicacion_id INT, -- FK
+  rango_etario_cliente INT, -- FK
   cantidad BIGINT,
   total_facturacion DECIMAL (18, 2),
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
@@ -207,10 +207,10 @@ WHERE [name] = 'BI_hechos_compras')
 CREATE TABLE [DROP_TABLE].[BI_hechos_compras]
 (
   compras_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
-  tiempo_id INT,
+  tiempo_id INT, -- FK
   sucursal_numero BIGINT,
-  ubicacion_id INT,
-  tipo_material INT,
+  ubicacion_id INT, -- FK
+  tipo_material INT, -- FK
   cantidad BIGINT,
   total_compra DECIMAL (18, 2),
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
@@ -224,8 +224,8 @@ WHERE [name] = 'BI_hechos_envios')
 CREATE TABLE [DROP_TABLE].[BI_hechos_envios]
 (
   envios_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
-  tiempo_id INT,
-  ubicacion_id INT,
+  tiempo_id INT, -- FK
+  ubicacion_id INT, -- FK
   estado_envio NVARCHAR(255),
   envio_fecha_programada DATETIME2(2),
   envio_fecha_entrega DATETIME2(2),
@@ -420,17 +420,17 @@ INSERT INTO [DROP_TABLE].[BI_hechos_pedidos]
   estado
   )
 SELECT
-  P.numero,
-  [DROP_TABLE].fn_GetTiempoId(P.fecha),
-  DM.modelo_id,
-  [DROP_TABLE].fn_GetTurnoId(P.fecha),
+  p.numero,
+  [DROP_TABLE].fn_GetTiempoId(p.fecha),
+  dm.modelo_id,
+  [DROP_TABLE].fn_GetTurnoId(p.fecha),
   su.numero,
-  P.estado
-FROM [DROP_TABLE].Pedido P
-  LEFT JOIN [DROP_TABLE].ItemPedido PS ON PS.pedido_id = P.pedido_id
-  LEFT JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
-  LEFT JOIN [DROP_TABLE].BI_dimension_modelo_sillon DM ON DM.modelo_id = PS.sillon_id
-  JOIN DROP_TABLE.Sucursal su ON su.sucursal_id=p.sucursal
+  p.estado
+FROM [DROP_TABLE].Pedido p
+  LEFT JOIN [DROP_TABLE].ItemPedido ps ON ps.pedido_id = p.pedido_id
+  LEFT JOIN [DROP_TABLE].Sillon s ON s.sillon_id = ps.sillon_id
+  LEFT JOIN [DROP_TABLE].BI_dimension_modelo_sillon dm ON dm.modelo_id = ps.sillon_id
+  LEFT JOIN [DROP_TABLE].Sucursal su ON su.sucursal_id = p.sucursal
 GO
 
 INSERT INTO [DROP_TABLE].[BI_hechos_facturacion]
@@ -575,13 +575,44 @@ AS
   JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_id
   GROUP BY
     u.provincia_descripcion,
-    t.cuatrimestre
+    t.cuatrimestre,
+    t.anio
 GO
 
 -- Punto 3
--- CREATE VIEW [DROP_TABLE].v_rendimiento_modelos
--- AS
--- GO
+CREATE VIEW [DROP_TABLE].v_rendimiento_modelos
+AS
+  SELECT *
+  FROM (
+    SELECT
+      t.anio,
+      t.cuatrimestre,
+      m.modelo_descripcion,
+      u.ubicacion_id,
+      e.rango_descripcion,
+      SUM(v.total_facturacion) AS total_facturacion,
+      ROW_NUMBER() OVER (
+        PARTITION BY
+          t.anio,
+          t.cuatrimestre,
+          u.ubicacion_id,
+          e.rango_descripcion
+        ORDER BY SUM(v.total_facturacion) DESC
+      ) AS ranking_ventas
+    FROM [DROP_TABLE].BI_hechos_ventas v
+    JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = v.tiempo_facturacion
+    JOIN [DROP_TABLE].BI_dimension_modelo_sillon m ON m.modelo_id = v.sillon_modelo
+    JOIN [DROP_TABLE].BI_dimension_rangos_edades e ON e.rango_id = v.rango_etario_cliente
+    JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = v.ubicacion_id
+    GROUP BY
+      t.anio,
+      t.cuatrimestre,
+      m.modelo_descripcion,
+      u.ubicacion_id,
+      e.rango_descripcion
+  ) AS ventas_con_ranking
+  WHERE ranking_ventas <= 3
+GO
 
 --Punto 4
 CREATE VIEW [DROP_TABLE].v_volumen_de_pedidos
@@ -672,11 +703,11 @@ GO
 CREATE VIEW [DROP_TABLE].v_porcentaje_cumplimiento_envios
 AS
   SELECT
-    T.anio AS Anio,
-    T.mes AS Mes,
-    (SUM([DROP_TABLE].fn_EnvioCumplido(HE.envio_fecha_entrega, HE.envio_fecha_programada)) / COUNT(1)) * 100 AS PorcentajeCumplimientoEnvio
-  FROM [DROP_TABLE].BI_hechos_envios HE
-    INNER JOIN [DROP_TABLE].BI_dimension_tiempos T ON T.tiempo_id = HE.tiempo_id
+    t.anio AS Anio,
+    t.mes AS Mes,
+    (SUM([DROP_TABLE].fn_EnvioCumplido(e.envio_fecha_entrega, e.envio_fecha_programada)) / COUNT(1)) * 100 AS PorcentajeCumplimientoEnvio
+  FROM [DROP_TABLE].BI_hechos_envios e
+  INNER JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = e.tiempo_id
   GROUP BY t.anio, t.mes;
 GO
 
@@ -687,12 +718,12 @@ AS
     localidad_descripcion,
     total_costo_envio
   FROM (
-    SELECT TOP 5
-      DU.localidad_descripcion,
-      SUM(HE.costo) AS total_costo_envio
-    FROM [DROP_TABLE].BI_hechos_envios HE
-      JOIN [DROP_TABLE].BI_dimension_ubicaciones DU ON HE.ubicacion_id = DU.ubicacion_id
-    GROUP BY DU.localidad_descripcion
-    ORDER BY SUM(HE.costo) DESC
+    SELECT TOP 3
+      u.localidad_descripcion,
+      SUM(e.costo) / COUNT(*) AS total_costo_envio
+    FROM [DROP_TABLE].BI_hechos_envios e
+      JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON e.ubicacion_id = u.ubicacion_id
+    GROUP BY u.localidad_descripcion
+    ORDER BY SUM(e.costo) / COUNT(*) DESC
 ) AS subquery;
 GO

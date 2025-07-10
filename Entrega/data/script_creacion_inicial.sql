@@ -316,6 +316,7 @@ WHERE [name] = 'DetalleCompra')
 CREATE TABLE [DROP_TABLE].[DetalleCompra]
 (
   detalle_compra_id DECIMAL(18, 0) IDENTITY(1,1) PRIMARY KEY,
+  compra DECIMAL(18, 0), -- FK
   material_id DECIMAL(18, 0), -- FK
   precio_unitario DECIMAL(18, 2),
   cantidad DECIMAL(18, 0),
@@ -415,6 +416,9 @@ ADD FOREIGN KEY (sillon_id) REFERENCES [DROP_TABLE].Sillon(sillon_id);
 
 ALTER TABLE [DROP_TABLE].[SillonMaterial]
 ADD FOREIGN KEY (material_id) REFERENCES [DROP_TABLE].Material(material_id);
+
+ALTER TABLE [DROP_TABLE].[DetalleCompra]
+ADD FOREIGN KEY (compra) REFERENCES [DROP_TABLE].Compra(compra_id);
 
 ALTER TABLE [DROP_TABLE].[DetalleCompra]
 ADD FOREIGN KEY (material_id) REFERENCES [DROP_TABLE].Material(material_id);
@@ -792,17 +796,22 @@ GO
 
 INSERT INTO [DROP_TABLE].[DetalleCompra]
   (
+  compra,
   material_id,
   precio_unitario,
   cantidad,
   subtotal
   )
 SELECT
+  c.compra_id,
   mat.material_id,
   Detalle_Compra_Precio,
   Detalle_Compra_Cantidad,
   Detalle_Compra_SubTotal
 FROM gd_esquema.Maestra m
+  JOIN DROP_TABLE.Compra c ON c.numero = m.Compra_Numero
+    AND c.fecha_compra = m.Compra_Fecha
+    AND c.total = m.Compra_Total
   JOIN DROP_TABLE.Material mat
   ON mat.nombre = m.Material_Nombre
     AND mat.descripcion = m.Material_Descripcion

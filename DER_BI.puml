@@ -63,10 +63,11 @@ entity "BI_hechos_pedidos" {
     *estado: INT
 }
 
-entity "BI_hechos_ventas" {
-    *ventas_id: DECIMAL (18, 0) <<generated>>
+entity "BI_hechos_facturacion" {
+    *facturacion_id: DECIMAL (18, 0) <<generated>>
     --
     *tiempo_id: INT
+    dias_desde_pedido_a_factura: INT,
     sucursal_numero: BIGINT
     *ubicacion_id: INT
     *rango_etario_cliente: INT
@@ -89,8 +90,8 @@ entity "BI_hechos_compras" {
 entity "BI_hechos_envios" {
     *envio_id: DECIMAL(18,2) <<generated>>
     --
-    tiempo_id INT
-    ubicacion_id INT
+    *tiempo_id INT
+    *ubicacion_id INT
     estado_envio NVARCHAR(255)
     envio_fecha_programada DATETIME2(2)
     envio_fecha_entrega DATETIME2(2)
@@ -101,9 +102,10 @@ BI_hechos_pedidos ||-u-|| BI_dimension_tiempos
 BI_hechos_pedidos ||--|| BI_dimension_turnos
 BI_hechos_pedidos ||-u-|| BI_dimension_modelo_sillon
 BI_hechos_pedidos ||--|| BI_dimension_estado_pedido
-BI_hechos_ventas ||-u-|| BI_dimension_tiempos
-BI_hechos_ventas ||--|| BI_dimension_ubicaciones
-BI_hechos_ventas ||-u-|| BI_dimension_rangos_edades
+BI_hechos_facturacion ||-u-|| BI_dimension_tiempos
+BI_hechos_facturacion ||--|| BI_dimension_ubicaciones
+BI_hechos_facturacion ||-u-|| BI_dimension_rangos_edades
+BI_hechos_facturacion ||-u-|| BI_dimension_modelo_sillon
 BI_hechos_compras ||-u-|| BI_dimension_tiempos
 BI_hechos_compras ||--|| BI_dimension_ubicaciones
 BI_hechos_compras ||--|| BI_dimension_tipo_material
