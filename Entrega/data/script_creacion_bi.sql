@@ -87,9 +87,10 @@ IF OBJECT_ID('DROP_TABLE.BI_hechos_envios','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_hechos_envios;
 IF OBJECT_ID('DROP_TABLE.BI_hechos_pedidos','U') IS NOT NULL
   DROP TABLE [DROP_TABLE].BI_hechos_pedidos;
-IF OBJECT_ID('DROP_TABLE.BI_hechos_ventas','U') IS NOT NULL
-  DROP TABLE [DROP_TABLE].BI_hechos_ventas;
+IF OBJECT_ID('DROP_TABLE.BI_hechos_facturacion','U') IS NOT NULL
+  DROP TABLE [DROP_TABLE].BI_hechos_facturacion;
 GO
+
 
 -- Creacion de tablas
 BEGIN TRANSACTION
@@ -182,18 +183,20 @@ CREATE TABLE [DROP_TABLE].[BI_hechos_pedidos]
 
 IF NOT EXISTS(SELECT [name]
 FROM sys.tables
-WHERE [name] = 'BI_hechos_ventas')
-CREATE TABLE [DROP_TABLE].[BI_hechos_ventas]
+WHERE [name] = 'BI_hechos_facturacion')
+CREATE TABLE [DROP_TABLE].[BI_hechos_facturacion]
 (
   ventas_id DECIMAL (18, 0) IDENTITY(1,1) PRIMARY KEY,
-  tiempo_id INT,
+  tiempo_facturacion INT,
+  tiempo_pedido INT,
   sucursal_numero BIGINT,
   sillon_modelo INT,
   ubicacion_id INT,
   rango_etario_cliente INT,
   cantidad BIGINT,
   total_facturacion DECIMAL (18, 2),
-  FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
+  FOREIGN KEY(tiempo_facturacion) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
+  FOREIGN KEY(tiempo_pedido) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(ubicacion_id) REFERENCES [DROP_TABLE].[BI_dimension_ubicaciones],
   FOREIGN KEY(rango_etario_cliente) REFERENCES [DROP_TABLE].[BI_dimension_rangos_edades],
   FOREIGN KEY(sillon_modelo) REFERENCES [DROP_TABLE].[BI_dimension_modelo_sillon],
@@ -335,7 +338,6 @@ END;
 GO
 
 -- ================= Carga datos =============================
-
 BEGIN TRANSACTION
 
 INSERT INTO [DROP_TABLE].[BI_dimension_tiempos]
@@ -345,7 +347,14 @@ INSERT INTO [DROP_TABLE].[BI_dimension_tiempos]
   anio
   )
 SELECT DISTINCT MONTH(fecha), [DROP_TABLE].fn_GetCuatrimestre(fecha), YEAR(fecha)
-FROM [DROP_TABLE].Factura
+FROM (
+  SELECT fecha FROM [DROP_TABLE].Factura
+  UNION
+  SELECT fecha FROM [DROP_TABLE].Pedido
+  UNION
+  SELECT fecha_compra FROM [DROP_TABLE].Compra
+) AS fechas
+
 ORDER BY 1
 GO
 
@@ -416,17 +425,19 @@ SELECT
   [DROP_TABLE].fn_GetTiempoId(P.fecha),
   DM.modelo_id,
   [DROP_TABLE].fn_GetTurnoId(P.fecha),
-  P.sucursal,
+  su.numero,
   P.estado
 FROM [DROP_TABLE].Pedido P
   LEFT JOIN [DROP_TABLE].ItemPedido PS ON PS.pedido_id = P.pedido_id
   LEFT JOIN [DROP_TABLE].Sillon S ON S.sillon_id = PS.sillon_id
   LEFT JOIN [DROP_TABLE].BI_dimension_modelo_sillon DM ON DM.modelo_id = PS.sillon_id
+  JOIN DROP_TABLE.Sucursal su ON su.sucursal_id=p.sucursal
 GO
 
-INSERT INTO [DROP_TABLE].[BI_hechos_ventas]
+INSERT INTO [DROP_TABLE].[BI_hechos_facturacion]
   (
-  tiempo_id,
+  tiempo_facturacion,
+  tiempo_pedido,
   sucursal_numero,
   sillon_modelo,
   ubicacion_id,
@@ -436,6 +447,7 @@ INSERT INTO [DROP_TABLE].[BI_hechos_ventas]
   )
 SELECT
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
+  [DROP_TABLE].fn_GetTiempoId(Ped.fecha),
   S.numero,
   Si.modelo,
   U.ubicacion_id,
@@ -453,7 +465,11 @@ FROM [DROP_TABLE].Factura F
   JOIN [DROP_TABLE].DetalleFactura DF ON DF.factura_id = F.factura_id
   JOIN [DROP_TABLE].ItemPedido I ON I.item_pedido_id = DF.detalle_id
   JOIN [DROP_TABLE].Sillon Si ON Si.sillon_id = I.sillon_id
-GROUP BY [DROP_TABLE].fn_GetTiempoId(F.fecha),
+  JOIN [DROP_TABLE].Pedido Ped ON Ped.pedido_id = I.pedido_id
+														
+GROUP BY 
+  [DROP_TABLE].fn_GetTiempoId(F.fecha),
+  [DROP_TABLE].fn_GetTiempoId(Ped.fecha),
   S.numero,
   Si.modelo,
   U.ubicacion_id,
@@ -544,29 +560,29 @@ AS
   SELECT DISTINCT
     t.mes,
     t.anio,
-    v.sucursal_numero,
-    SUM(ISNULL(v.total_facturacion, 0)) - SUM(ISNULL(c.total_compra, 0)) AS ganancia
-  FROM [DROP_TABLE].BI_hechos_ventas v
-  LEFT JOIN [DROP_TABLE].BI_hechos_compras c ON c.sucursal_numero = v.sucursal_numero
-    AND c.tiempo_id = v.tiempo_id
-    AND c.ubicacion_id = v.ubicacion_id
-  LEFT JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = v.tiempo_id
+    f.sucursal_numero,
+    SUM(ISNULL(f.total_facturacion, 0)) - SUM(ISNULL(c.total_compra, 0)) AS ganancia
+  FROM [DROP_TABLE].BI_hechos_facturacion f
+  LEFT JOIN [DROP_TABLE].BI_hechos_compras c ON c.sucursal_numero = f.sucursal_numero
+    AND c.tiempo_id = f.tiempo_facturacion
+    AND c.ubicacion_id = f.ubicacion_id
+  LEFT JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_facturacion
   GROUP BY
     t.mes,
     t.anio,
-    v.sucursal_numero
+    f.sucursal_numero
 GO
 
 -- Punto 2
 CREATE VIEW [DROP_TABLE].v_factura_promedio_mensual
 AS
   SELECT DISTINCT
-    CAST(SUM(ISNULL(v.total_facturacion, 0)) / SUM(ISNULL(v.cantidad, 0)) AS DECIMAL(18,2)) AS promedio_factura,
+    CAST(SUM(ISNULL(f.total_facturacion, 0)) / SUM(ISNULL(f.cantidad, 0)) AS DECIMAL(18,2)) AS promedio_factura,
     u.provincia_descripcion AS provincia,
     t.cuatrimestre AS cuatrimestre
-  FROM [DROP_TABLE].BI_hechos_ventas v
-  JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = v.ubicacion_id
-  JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = v.tiempo_id
+  FROM [DROP_TABLE].BI_hechos_facturacion f
+  JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.ubicacion_id = f.ubicacion_id
+  JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_facturacion
   GROUP BY
     u.provincia_descripcion,
     t.cuatrimestre
@@ -577,21 +593,69 @@ GO
 -- AS
 -- GO
 
--- Punto 4
--- CREATE VIEW [DROP_TABLE].v_volumen_de_pedidos
--- AS
--- GO
+--Punto 4
+CREATE VIEW [DROP_TABLE].v_volumen_de_pedidos
+AS
+SELECT
+    t.anio,
+    t.mes,
+    tr.turno_descripcion AS turno,
+    h.sucursal_numero,
+    COUNT(*) AS cantidad_pedidos
+	FROM DROP_TABLE.BI_hechos_pedidos h
+JOIN DROP_TABLE.BI_dimension_tiempos t ON h.tiempo_id = t.tiempo_id
+JOIN DROP_TABLE.BI_dimension_turnos tr ON h.turno = tr.turno_id
+GROUP BY
+    t.anio,
+    t.mes,
+    tr.turno_descripcion,
+    h.sucursal_numero;
+GO
 
 -- Punto 5
--- CREATE VIEW [DROP_TABLE].v_conversion_de_pedidos
--- AS
--- GO
+CREATE VIEW [DROP_TABLE].v_conversion_de_pedidos
+AS
+SELECT DISTINCT
+	t.cuatrimestre,
+	p.sucursal_numero,
+	t.anio,
+	p.estado,
+	CAST(COUNT(p.pedido_id) * 100.0 / SUM(COUNT(p.estado)) OVER (PARTITION BY t.cuatrimestre, p.sucursal_numero, t.anio)AS DECIMAL(10, 2)) AS porcentaje
+	FROM DROP_TABLE.BI_hechos_pedidos p
+JOIN DROP_TABLE.BI_dimension_tiempos t ON p.tiempo_id = t.tiempo_id
+JOIN DROP_TABLE.BI_dimension_estado_pedido ep ON p.estado= ep.estado_id
+GROUP BY 
+	t.cuatrimestre,
+	p.sucursal_numero,
+	t.anio,
+	p.estado
+GO
 
 -- Punto 6
--- CREATE VIEW [DROP_TABLE].v_promedio_fabricacion
--- AS
--- GO
+CREATE VIEW [DROP_TABLE].v_promedio_fabricacion
+AS
+SELECT 
+	tf.cuatrimestre,
+	tf.anio,
+	f.sucursal_numero,
+	AVG(DATEDIFF(MONTH, CAST(tp.anio AS varchar) + '-' + RIGHT('0' + CAST(tp.mes AS varchar), 2) + '-01',
+					CAST(tf.anio AS varchar) + '-' + RIGHT('0' + CAST(tf.mes AS varchar), 2) + '-01' ))
+		AS promedio_fabricacion
+	FROM DROP_TABLE.BI_hechos_facturacion f
+LEFT JOIN DROP_TABLE.BI_dimension_tiempos tf ON tf.tiempo_id = f.tiempo_facturacion
+LEFT JOIN DROP_TABLE.BI_dimension_tiempos tp ON tp.tiempo_id = f.tiempo_pedido
+GROUP BY 
+	tf.cuatrimestre,
+	tf.anio,
+	f.sucursal_numero
+GO
 
+SELECT COUNT(*) AS sin_pedido
+FROM DROP_TABLE.BI_hechos_facturacion f
+LEFT JOIN DROP_TABLE.BI_dimension_tiempos tp ON tp.tiempo_id = f.tiempo_pedido
+WHERE tp.tiempo_id IS NULL;
+GO
+    
 -- Punto 7
 CREATE VIEW [DROP_TABLE].v_promedio_compras
 AS
@@ -650,7 +714,4 @@ AS
     GROUP BY DU.localidad_descripcion
     ORDER BY SUM(HE.costo) DESC
 ) AS subquery;
-GO
-
-COMMIT
 GO
