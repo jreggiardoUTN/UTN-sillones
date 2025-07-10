@@ -92,7 +92,7 @@ entity "BI_hechos_envios" {
     --
     *tiempo_id INT
     *ubicacion_id INT
-    estado_envio NVARCHAR(255)
+    *estado_envio INT
     envio_fecha_programada DATETIME2(2)
     envio_fecha_entrega DATETIME2(2)
     costo DECIMAL(18,2)
