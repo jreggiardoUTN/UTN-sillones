@@ -515,7 +515,7 @@ INSERT INTO [DROP_TABLE].[BI_hechos_envios]
   )
 SELECT DISTINCT
   [DROP_TABLE].fn_GetTiempoId(f.fecha),
-  [DROP_TABLE].fn_GetUbicacionId(l.descripcion, p.descripcion),
+  u.ubicacion_id,
   es.estado_id,
   e.fecha_programada,
   e.fecha_entrega,
@@ -528,12 +528,14 @@ FROM [DROP_TABLE].Envio E
   JOIN [DROP_TABLE].Cliente c ON c.cliente_id = f.cliente
   JOIN [DROP_TABLE].Pedido pe ON pe.pedido_id = c.cliente_id
   JOIN [DROP_TABLE].Estado es ON es.estado_id = pe.estado
+  JOIN [DROP_TABLE].BI_dimension_ubicaciones u ON u.localidad_descripcion = l.descripcion
+    AND u.provincia_descripcion = p.descripcion
 GROUP BY
   f.numero,
   e.numero,
   [DROP_TABLE].fn_GetTiempoId(F.fecha),
   F.fecha,
-  [DROP_TABLE].fn_GetUbicacionId(l.descripcion, p.descripcion),
+  u.ubicacion_id,
   es.estado_id,
 	e.fecha_programada,
 	e.fecha_entrega
@@ -710,7 +712,6 @@ AS
   JOIN [DROP_TABLE].BI_dimension_estado_pedido es ON es.estado_id = e.estado_envio
   WHERE es.estado_descripcion = 'ENTREGADO'
   GROUP BY t.anio, t.mes
-ORDER BY 3
 GO
 
 -- Punto 10
