@@ -193,7 +193,7 @@ CREATE TABLE [DROP_TABLE].[BI_hechos_facturacion]
   sillon_modelo INT, -- FK
   ubicacion_id INT, -- FK
   rango_etario_cliente INT, -- FK
-  cantidad BIGINT,
+  cantidad_unidades BIGINT,
   total_facturacion DECIMAL (18, 2),
   FOREIGN KEY(tiempo_id) REFERENCES [DROP_TABLE].[BI_dimension_tiempos],
   FOREIGN KEY(ubicacion_id) REFERENCES [DROP_TABLE].[BI_dimension_ubicaciones],
@@ -442,7 +442,7 @@ INSERT INTO [DROP_TABLE].[BI_hechos_facturacion]
   sillon_modelo,
   ubicacion_id,
   rango_etario_cliente,
-  cantidad,
+  cantidad_unidades,
   total_facturacion
   )
 SELECT
@@ -452,7 +452,7 @@ SELECT
   si.modelo AS sillon_modelo,
   [DROP_TABLE].fn_GetUbicacionId(L.descripcion, Pr.descripcion) AS ubicacion_id,
   [DROP_TABLE].fn_GetRangoEdadId(c.fecha_nacimiento) AS rango_etario_cliente,
-  COUNT(*) AS cantidad,
+  SUM(ISNULL(df.cantidad, 0)) AS cantidad_unidades,
   SUM(ISNULL(f.total, 0)) AS total_facturacion
 FROM DROP_TABLE.Factura f
 JOIN DROP_TABLE.DetalleFactura df ON df.factura_id = f.factura_id
@@ -471,6 +471,7 @@ GROUP BY
   si.modelo,
   [DROP_TABLE].fn_GetUbicacionId(l.descripcion, pr.descripcion),
   [DROP_TABLE].fn_GetRangoEdadId(c.fecha_nacimiento)
+ORDER BY 7
 GO
 
 INSERT INTO [DROP_TABLE].[BI_hechos_compras]
@@ -592,14 +593,14 @@ AS
       m.modelo_descripcion,
       u.ubicacion_id,
       e.rango_descripcion,
-      SUM(f.total_facturacion) AS total_facturacion,
+      SUM(f.cantidad_unidades) AS cantidad_unidades,
       ROW_NUMBER() OVER (
         PARTITION BY
           t.anio,
           t.cuatrimestre,
           u.ubicacion_id,
           e.rango_descripcion
-        ORDER BY SUM(f.total_facturacion) DESC
+        ORDER BY SUM(f.cantidad_unidades) DESC
       ) AS ranking_ventas
     FROM [DROP_TABLE].BI_hechos_facturacion f
     JOIN [DROP_TABLE].BI_dimension_tiempos t ON t.tiempo_id = f.tiempo_id
