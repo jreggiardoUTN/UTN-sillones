@@ -72,7 +72,7 @@ entity "BI_hechos_facturacion" {
     *ubicacion_id: INT
     *rango_etario_cliente: INT
     *sillon_modelo: INT
-    cantidad: BIGINT
+    cantidad_unidades: BIGINT
     total_facturacion: DECIMAL (18, 2)
 }
 
